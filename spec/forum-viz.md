@@ -2,6 +2,160 @@
 
 **Status**: brainstorm. No code yet — call this when you want it implemented.
 
+## Framing: the user is the emperor, not a peer
+
+The user **is not** the founder, is not "another voice in the senate", does
+not propose alice or vote on contract changes. The user is Augustus — the
+person whose word starts the project and (occasionally) reorients it. Two
+verbs, full stop:
+
+- **Proclaim**: "Let's build a Netflix clone." / "Pivot toward a kanban
+  tool instead." / "We need this shipped by tomorrow." High-level intent,
+  never an implementation directive.
+- **Decree** (rare, blunt): edit a charter, exile a pod, halt the senate.
+  Goes through the same UI but is visibly heavier.
+
+The senate brainstorms; the emperor sets the horizon. Pi-as-founder reads
+the proclamation, decides on the smallest viable set of peers, proposes
+them, and the resulting peer group deliberates the first architecture.
+Whether the project ends up monolithic, three-pod, or six-pod is an output
+of that deliberation, **not** something the user spelled out in the
+proclamation.
+
+### How that changes the UI surface
+
+- The mandate input is renamed **proclamation** (or `Edictum` if we lean
+  into the bit). No target-pod selector — proclamations go to the project,
+  which in practice means the founder's inbox plus a bus broadcast on
+  `system/mandate`. If the founder is not running, the proclamation seeds
+  the founder pod and then wakes it.
+- The text reads heavy on submit: "Augustus has spoken." or "The Emperor
+  proclaims:" then the text echoes back on the senate band as a marble
+  tablet. Not in a corner; *front and centre*. The pods spin up under it
+  visually — the proclamation is the cause, the pods are the consequence.
+- A **proclamation timeline** along the top: each proclamation a stone
+  cartouche with a timestamp + the first 60 chars. Click to expand to the
+  full text and see which ADRs trace back to it.
+- The Wizard view's "issue first mandate" step is replaced by the same
+  proclamation UI inline on the Forum. There is no separate "launch"
+  ceremony — the first proclamation IS the launch.
+
+### The first ADR — a placeholder, not a decree
+
+Today, the first ADR is whatever the founder happens to write as part of
+its admission. That's the wrong shape. The right shape:
+
+1. Emperor proclaims `"build a Netflix clone"`.
+2. Spawner brings up the founder pod with an **empty placeholder ADR
+   pre-seeded** at `adr-0001` with title "Architecture for: build a
+   Netflix clone" and body `_pending senate council_`. The Tabularium
+   shows it as a clay tablet (not yet stone) with a dashed border.
+3. Founder reads the proclamation + the placeholder, calls
+   `senate.propose_member` for a small group of peers it thinks the
+   project needs (e.g., `catalog`, `streaming`, `auth`, `web`). Each
+   proposal includes a one-line "why I think this pod is needed" rationale
+   that gets attached to the placeholder ADR as a draft note.
+4. Once peers are admitted, the founder convenes a council
+   (`coms.convene_council`) on the topic "first architecture". Each peer
+   contributes their view. The council closes with a summary that becomes
+   the **finalised body** of `adr-0001`. At that point the tablet hardens
+   from clay to stone in the Tabularium.
+5. From there it's normal Conclave: peer councils, contract-change
+   proposals, ADR per decision.
+
+The placeholder is important because it gives the user something to look
+at the moment they hit "Send" — and a visible "brainstorm in progress"
+state instead of an empty `state/members` and `decisions_list_adrs`
+returning `[]`. The clay→stone transition is a visual heartbeat: the
+project is *becoming* something.
+
+### What the spawner needs to do to support this
+
+- On the very first proclamation (i.e. no founder yet running):
+  1. Seed `pods/founder/` if missing.
+  2. Launch the founder container.
+  3. **Pre-seed the placeholder ADR via the senate REST surface**
+     (`POST /adrs` with a `status: placeholder` field — needs a column
+     added to the ADR row) so it shows up in the Tabularium before any
+     agent has even loaded.
+  4. Publish `goal_updated` with the proclamation text to the founder's
+     inbox.
+- On a second-or-later proclamation, no seeding; just publish.
+- Detect "is the founder already running?" via
+  `docker ps --filter name=^conclave-founder$`.
+
+### Imperial vs senate language in the rest of the UI
+
+- Forum: the proclamation belongs to "the Emperor". Pod sprites continue
+  to look like Roman characters; they remain peers.
+- Tabularium: ADRs sealed with the senate's "S·P·Q·R" mark. Placeholders
+  show a draft seal.
+- Council: chatrooms styled as the senate floor. The user can read but
+  cannot speak — the senate is the senate; the emperor doesn't sit on it.
+- Charter Editor: this is the one place the emperor can override the
+  senate (per spec §13 — charter edits are a user write path). Style it
+  as "Imperial decree" with a heavy serif and a "stamp before signing"
+  confirmation step so the user doesn't accidentally rewrite someone's
+  identity.
+- Exile District: same treatment as charter — exile is also an
+  imperial-or-senate action; both paths land here.
+
+### Concretely, the proclamation flow
+
+```
+   ┌────────────────────────┐
+   │ EMPEROR (the user)     │
+   │ "Build a Netflix clone"│
+   └──────────┬─────────────┘
+              │ proclaim
+              ▼
+   ┌────────────────────────┐
+   │ /control/proclamation  │  (rename from /control/mandate)
+   │  • seed founder if     │
+   │    not running         │
+   │  • pre-seed placeholder│
+   │    adr-0001 (clay)     │
+   │  • publish goal_updated│
+   │    to pod/founder/inbox│
+   │  • broadcast on        │
+   │    system/mandate      │
+   └──────────┬─────────────┘
+              │
+              ▼
+   ┌────────────────────────┐
+   │ Founder pod            │
+   │  reads proclamation +  │
+   │  placeholder ADR       │
+   │  proposes 3–5 peers    │
+   │  with draft rationales │
+   │  attached to adr-0001  │
+   └──────────┬─────────────┘
+              │
+              ▼
+   ┌────────────────────────┐
+   │ Spawner launches peers │
+   │ Peers boot, read their │
+   │ charters + adr-0001    │
+   └──────────┬─────────────┘
+              │
+              ▼
+   ┌────────────────────────┐
+   │ Founder convenes       │
+   │ council on first       │
+   │ architecture           │
+   │ Peers deliberate       │
+   │ Council summary becomes│
+   │ finalised adr-0001     │
+   │ Tablet: clay → stone   │
+   └────────────────────────┘
+```
+
+The Forum should make this whole sequence visually obvious as it unfolds.
+The proclamation, the empty pods spawning, the placeholder ADR materialising
+under the band, the council line lighting up when the council opens, the
+tablet hardening when the council closes — that's the "Conclave is alive"
+moment we want every demo to land.
+
 ## What's wrong today
 
 The current Forum view (`ui/src/views/Forum.tsx`) renders pods as static
