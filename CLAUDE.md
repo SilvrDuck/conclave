@@ -26,6 +26,7 @@
 - No backwards-compatibility shims when you can just change the code. No feature flags for hypothetical rollbacks.
 - No half-finished implementations. If you can't complete it, say so explicitly rather than leaving stubs.
 - Root-cause obstacles instead of bypassing them (no `--no-verify`, no silencing type errors, no deleting failing tests).
+- Always research libraries and tools you use before hand. Don't code from memory. When you review your code, check for this as well. Use Context7 a lot.
 
 ## Important constraints
 
@@ -37,4 +38,3 @@
 ## Writing style
 
 - Be brief.
-
