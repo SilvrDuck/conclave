@@ -1,0 +1,36 @@
+{
+  "mcpServers": {
+    "playwright": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "@playwright/mcp@latest",
+        "--browser=chromium",
+        "--headless"
+      ],
+      "env": {}
+    },
+    "chrome-devtools": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--headless=true",
+        "--isolated=true"
+      ],
+      "env": {}
+    },
+    "graphify": {
+      "type": "stdio",
+      "command": "/home/thibault/.local/share/uv/tools/graphifyy/bin/python",
+      "args": [
+        "-m",
+        "graphify.serve",
+        "/home/thibault/code/conclave/graphify-out/graph.json"
+      ],
+      "env": {}
+    }
+  }
+}

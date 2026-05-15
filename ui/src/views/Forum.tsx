@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import { getAgenda, listMembers, sendMandate } from "../api/observer";
 import type { AgendaSnapshot, Member } from "../api/observer";
+import { ActivityPanel } from "../components/ActivityPanel";
 import { drawDomus, spritePosition } from "../components/Sprite";
 
 const CANVAS_W = 800;
@@ -102,6 +103,7 @@ export function Forum() {
       <p style={{ marginTop: "1rem", color: "var(--stone)" }}>
         Members: {members ? members.length : "..."}
       </p>
+      <ActivityPanel />
     </section>
   );
 }

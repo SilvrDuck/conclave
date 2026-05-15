@@ -1,0 +1,952 @@
+{
+  "/home/thibault/code/conclave/kickstart.sh": {
+    "mtime": 1778884834.9046857,
+    "ast_hash": "9cad2e08abf49647f6a5524b699ce62c",
+    "semantic_hash": "9cad2e08abf49647f6a5524b699ce62c"
+  },
+  "/home/thibault/code/conclave/.mcp.json": {
+    "mtime": 1778887904.4153626,
+    "ast_hash": "b48825e3d8fb3364fe17a8bc1d8e33ed",
+    "semantic_hash": "b48825e3d8fb3364fe17a8bc1d8e33ed"
+  },
+  "/home/thibault/code/conclave/.claude/settings.local.json": {
+    "mtime": 1778887808.0816498,
+    "ast_hash": "cec8d7a92fc2673ff87f4a8487ef040d",
+    "semantic_hash": "cec8d7a92fc2673ff87f4a8487ef040d"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/__init__.py": {
+    "mtime": 1778860209.9322808,
+    "ast_hash": "ba606f05cb616d790018153638d6546e",
+    "semantic_hash": "ba606f05cb616d790018153638d6546e"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/core/ids.py": {
+    "mtime": 1778860266.0557678,
+    "ast_hash": "e10ae26739c6cf8fcabb3494d4379546",
+    "semantic_hash": "e10ae26739c6cf8fcabb3494d4379546"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/core/time.py": {
+    "mtime": 1778860268.2067866,
+    "ast_hash": "beae0b4399f8668270260d36025abc7a",
+    "semantic_hash": "beae0b4399f8668270260d36025abc7a"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/core/config.py": {
+    "mtime": 1778860283.46292,
+    "ast_hash": "ae49b171604322306a60a22fb9d487b7",
+    "semantic_hash": "ae49b171604322306a60a22fb9d487b7"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/core/__init__.py": {
+    "mtime": 1778860443.1243358,
+    "ast_hash": "f7e042dfe446c3b532d14c0839921074",
+    "semantic_hash": "f7e042dfe446c3b532d14c0839921074"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/core/events.py": {
+    "mtime": 1778860448.3313825,
+    "ast_hash": "0d3c52003965d9166013d32476b17f2c",
+    "semantic_hash": "0d3c52003965d9166013d32476b17f2c"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/core/models.py": {
+    "mtime": 1778863506.0074985,
+    "ast_hash": "fbd6833dc22588b149a1d7ee6a20da2c",
+    "semantic_hash": "fbd6833dc22588b149a1d7ee6a20da2c"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/__init__.py": {
+    "mtime": 1778860663.909341,
+    "ast_hash": "3f125dcd6f768e0edf6ebad687ded499",
+    "semantic_hash": "3f125dcd6f768e0edf6ebad687ded499"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/base/__init__.py": {
+    "mtime": 1778860660.291308,
+    "ast_hash": "921d01d160a08f8cdfe52a2f2cf45330",
+    "semantic_hash": "921d01d160a08f8cdfe52a2f2cf45330"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/bus/base.py": {
+    "mtime": 1778860520.13003,
+    "ast_hash": "f818298e0a2073d404e1855e06f3e6a3",
+    "semantic_hash": "f818298e0a2073d404e1855e06f3e6a3"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/bus/inmemory.py": {
+    "mtime": 1778860796.2845623,
+    "ast_hash": "f35791a155f4b1a45cc093ca8e839240",
+    "semantic_hash": "f35791a155f4b1a45cc093ca8e839240"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/bus/nats_impl.py": {
+    "mtime": 1778860814.0587273,
+    "ast_hash": "3f780749b0eefe4894ea1dedd07bc6d0",
+    "semantic_hash": "3f780749b0eefe4894ea1dedd07bc6d0"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/bus/redis_streams.py": {
+    "mtime": 1778861380.7440493,
+    "ast_hash": "a19184ebbbb9e5df715bd9828910019f",
+    "semantic_hash": "a19184ebbbb9e5df715bd9828910019f"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/bus/__init__.py": {
+    "mtime": 1778861437.7695897,
+    "ast_hash": "ce10fbc69d98bf04ef9d5974a139a1f7",
+    "semantic_hash": "ce10fbc69d98bf04ef9d5974a139a1f7"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/runtime/base.py": {
+    "mtime": 1778860525.9510827,
+    "ast_hash": "e1a7a1380427a64e1eb524c4912a81ec",
+    "semantic_hash": "e1a7a1380427a64e1eb524c4912a81ec"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/runtime/compose.py": {
+    "mtime": 1778861314.7324247,
+    "ast_hash": "05c6eec5ffd44e511c9356ae74929d3d",
+    "semantic_hash": "05c6eec5ffd44e511c9356ae74929d3d"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/runtime/k3d_terraform.py": {
+    "mtime": 1778861396.7202008,
+    "ast_hash": "a719e212ff755b9dcf0427f817099131",
+    "semantic_hash": "a719e212ff755b9dcf0427f817099131"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/runtime/__init__.py": {
+    "mtime": 1778861448.4716911,
+    "ast_hash": "4d4ee836195285d5fddcbf66d5ec49c1",
+    "semantic_hash": "4d4ee836195285d5fddcbf66d5ec49c1"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/repo/base.py": {
+    "mtime": 1778860531.742135,
+    "ast_hash": "27086f9bfdb33a153acafc2919d4b9a4",
+    "semantic_hash": "27086f9bfdb33a153acafc2919d4b9a4"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/repo/github.py": {
+    "mtime": 1778861132.444705,
+    "ast_hash": "c367cc90b71e31304c12b0772b930f7f",
+    "semantic_hash": "c367cc90b71e31304c12b0772b930f7f"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/repo/gitlab.py": {
+    "mtime": 1778861403.8652682,
+    "ast_hash": "e6e9ae54c1a5bb9f15c4b2c8fd03748c",
+    "semantic_hash": "e6e9ae54c1a5bb9f15c4b2c8fd03748c"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/repo/__init__.py": {
+    "mtime": 1778861452.1297257,
+    "ast_hash": "56d8366ba3d97adb312716198fe81e5d",
+    "semantic_hash": "56d8366ba3d97adb312716198fe81e5d"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/repo/local_git.py": {
+    "mtime": 1778883839.5156662,
+    "ast_hash": "627ebc61b264333f3dfdfed5a472f80d",
+    "semantic_hash": "627ebc61b264333f3dfdfed5a472f80d"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/ci/base.py": {
+    "mtime": 1778860536.894182,
+    "ast_hash": "fd30b8e416bc9b0ad1699bafda53da48",
+    "semantic_hash": "fd30b8e416bc9b0ad1699bafda53da48"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/ci/github_actions.py": {
+    "mtime": 1778861077.6191895,
+    "ast_hash": "457bd26b62cd31c0e2d169737e2c699d",
+    "semantic_hash": "457bd26b62cd31c0e2d169737e2c699d"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/ci/gitlab_ci.py": {
+    "mtime": 1778861409.014317,
+    "ast_hash": "2b54ed1149ec84d7ed47aac57a211bc9",
+    "semantic_hash": "2b54ed1149ec84d7ed47aac57a211bc9"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/ci/__init__.py": {
+    "mtime": 1778861455.9317617,
+    "ast_hash": "ef2cff60c64d48d8d1ce3c8847bd7160",
+    "semantic_hash": "ef2cff60c64d48d8d1ce3c8847bd7160"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/docs/base.py": {
+    "mtime": 1778860541.1202202,
+    "ast_hash": "fa4e62c05d3eb242b850be53eeaa3d91",
+    "semantic_hash": "fa4e62c05d3eb242b850be53eeaa3d91"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/docs/inmemory.py": {
+    "mtime": 1778860920.6007187,
+    "ast_hash": "beb636e3247323627ec58275129581f5",
+    "semantic_hash": "beb636e3247323627ec58275129581f5"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/docs/github_issues.py": {
+    "mtime": 1778860931.548821,
+    "ast_hash": "f1916d3ccbca67868ac8046c9d4390ed",
+    "semantic_hash": "f1916d3ccbca67868ac8046c9d4390ed"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/docs/obsidian.py": {
+    "mtime": 1778861415.4683783,
+    "ast_hash": "20238f8d6ac83310f0c5a6c6a0c2410e",
+    "semantic_hash": "20238f8d6ac83310f0c5a6c6a0c2410e"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/docs/sqlite_impl.py": {
+    "mtime": 1778864542.412559,
+    "ast_hash": "4a1cbdc6f13231d40f4069e0021f28e6",
+    "semantic_hash": "4a1cbdc6f13231d40f4069e0021f28e6"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/docs/senate_proxy.py": {
+    "mtime": 1778864845.7485924,
+    "ast_hash": "c96fe035e4ee4992f8f351176d680a5b",
+    "semantic_hash": "c96fe035e4ee4992f8f351176d680a5b"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/docs/__init__.py": {
+    "mtime": 1778864849.8756452,
+    "ast_hash": "e8ba412ba22f81cdf87182202cfcc334",
+    "semantic_hash": "e8ba412ba22f81cdf87182202cfcc334"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/trace/base.py": {
+    "mtime": 1778860545.2662578,
+    "ast_hash": "3e532a998747cc789d15958c0a6a0fb9",
+    "semantic_hash": "3e532a998747cc789d15958c0a6a0fb9"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/trace/otel_tempo.py": {
+    "mtime": 1778861007.019527,
+    "ast_hash": "3e4122fafb254e9bbf9a4e8304d24065",
+    "semantic_hash": "3e4122fafb254e9bbf9a4e8304d24065"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/trace/__init__.py": {
+    "mtime": 1778861466.6648636,
+    "ast_hash": "e4a43fe4b4571d59b1510ffb5fbeb7c9",
+    "semantic_hash": "e4a43fe4b4571d59b1510ffb5fbeb7c9"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/trace/linkerd.py": {
+    "mtime": 1778861571.52186,
+    "ast_hash": "e478bbf04797523a0973d9382e6afb18",
+    "semantic_hash": "e478bbf04797523a0973d9382e6afb18"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/log/base.py": {
+    "mtime": 1778860548.914291,
+    "ast_hash": "cb5878d0ed172351a7c91745b0352769",
+    "semantic_hash": "cb5878d0ed172351a7c91745b0352769"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/log/stdout.py": {
+    "mtime": 1778860978.7812626,
+    "ast_hash": "5709440c9be3a48df667b8c42d33c688",
+    "semantic_hash": "5709440c9be3a48df667b8c42d33c688"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/log/__init__.py": {
+    "mtime": 1778861470.202897,
+    "ast_hash": "9b80fe9b9759fda4077d7de49ea15cc0",
+    "semantic_hash": "9b80fe9b9759fda4077d7de49ea15cc0"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/log/loki.py": {
+    "mtime": 1778861575.1578953,
+    "ast_hash": "386add89bf4c3a4278cc246d3b0e33a3",
+    "semantic_hash": "386add89bf4c3a4278cc246d3b0e33a3"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/notify/base.py": {
+    "mtime": 1778860552.5793242,
+    "ast_hash": "eb241e4a1142038b4eb81321ae034a30",
+    "semantic_hash": "eb241e4a1142038b4eb81321ae034a30"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/notify/stdout.py": {
+    "mtime": 1778860955.1590416,
+    "ast_hash": "4f350272d5edb27400128f70a5d22a0c",
+    "semantic_hash": "4f350272d5edb27400128f70a5d22a0c"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/notify/telegram.py": {
+    "mtime": 1778861021.3226612,
+    "ast_hash": "6e6ed6183cccc0e7bd323f00cee54616",
+    "semantic_hash": "6e6ed6183cccc0e7bd323f00cee54616"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/notify/email.py": {
+    "mtime": 1778861433.484549,
+    "ast_hash": "0ea5582ee6fdbd5d440ec24a5ca2e328",
+    "semantic_hash": "0ea5582ee6fdbd5d440ec24a5ca2e328"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/notify/__init__.py": {
+    "mtime": 1778861475.2979455,
+    "ast_hash": "563cddf511547075acef6f389eb8925b",
+    "semantic_hash": "563cddf511547075acef6f389eb8925b"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/cli/base.py": {
+    "mtime": 1778860562.1454113,
+    "ast_hash": "d18352dbd83880a4cd41e56ea285f356",
+    "semantic_hash": "d18352dbd83880a4cd41e56ea285f356"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/cli/claude_code.py": {
+    "mtime": 1778861410.0873272,
+    "ast_hash": "e9640a274b2e79c58408325b53cc4eda",
+    "semantic_hash": "e9640a274b2e79c58408325b53cc4eda"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/cli/__init__.py": {
+    "mtime": 1778861413.7333617,
+    "ast_hash": "e1243cd288dba1b72f1458e988c445f3",
+    "semantic_hash": "e1243cd288dba1b72f1458e988c445f3"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/adapters/cli/pi.py": {
+    "mtime": 1778884061.4263463,
+    "ast_hash": "23de79889510ca76f23068cab10cae73",
+    "semantic_hash": "23de79889510ca76f23068cab10cae73"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/_common.py": {
+    "mtime": 1778862280.268725,
+    "ast_hash": "bc16b27ea28f616f563647b79c3296c1",
+    "semantic_hash": "bc16b27ea28f616f563647b79c3296c1"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/__init__.py": {
+    "mtime": 1778862396.3118424,
+    "ast_hash": "faa79170ad30d878ff28aeb525e168b2",
+    "semantic_hash": "faa79170ad30d878ff28aeb525e168b2"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/coms/server.py": {
+    "mtime": 1778862450.3533623,
+    "ast_hash": "9b7c9f1e5ece027ef96c5f94ce3ed0a2",
+    "semantic_hash": "9b7c9f1e5ece027ef96c5f94ce3ed0a2"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/coms/__init__.py": {
+    "mtime": 1778862397.6368551,
+    "ast_hash": "25319a8012b91b8c0e193f0021e8982a",
+    "semantic_hash": "25319a8012b91b8c0e193f0021e8982a"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/coms/main.py": {
+    "mtime": 1778862522.0210516,
+    "ast_hash": "c650de60610b22a2d823c620f2278008",
+    "semantic_hash": "c650de60610b22a2d823c620f2278008"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/senate/main.py": {
+    "mtime": 1778862330.6062098,
+    "ast_hash": "3762272de4e939b60316b10b6067d818",
+    "semantic_hash": "3762272de4e939b60316b10b6067d818"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/senate/__init__.py": {
+    "mtime": 1778862398.4048624,
+    "ast_hash": "c9cda1ca0a75f5fd77a21496fa4c9987",
+    "semantic_hash": "c9cda1ca0a75f5fd77a21496fa4c9987"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/senate/server.py": {
+    "mtime": 1778862516.4254146,
+    "ast_hash": "ffd6b8032bd26b3db3602597626248e7",
+    "semantic_hash": "ffd6b8032bd26b3db3602597626248e7"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/decisions/__init__.py": {
+    "mtime": 1778862399.9348772,
+    "ast_hash": "42f31ea5e1aff5bfaa5757b8065dfee3",
+    "semantic_hash": "42f31ea5e1aff5bfaa5757b8065dfee3"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/decisions/server.py": {
+    "mtime": 1778862465.183505,
+    "ast_hash": "7a962887921afcf14a84a9fe57c2e59f",
+    "semantic_hash": "7a962887921afcf14a84a9fe57c2e59f"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/decisions/main.py": {
+    "mtime": 1778864858.7447586,
+    "ast_hash": "829fdff6bc768ef46de3880a10d4b75d",
+    "semantic_hash": "829fdff6bc768ef46de3880a10d4b75d"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/state/server.py": {
+    "mtime": 1778862355.1844466,
+    "ast_hash": "8c6ff5407a06cf3c583c060734fa5f27",
+    "semantic_hash": "8c6ff5407a06cf3c583c060734fa5f27"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/state/main.py": {
+    "mtime": 1778862358.3134766,
+    "ast_hash": "cd045fd803d7f5aca86882b938d56b3b",
+    "semantic_hash": "cd045fd803d7f5aca86882b938d56b3b"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/mcp/state/__init__.py": {
+    "mtime": 1778862401.054888,
+    "ast_hash": "edcd62253bffc26199fd39838fbda63b",
+    "semantic_hash": "edcd62253bffc26199fd39838fbda63b"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/observer/db.py": {
+    "mtime": 1778861330.939578,
+    "ast_hash": "6c4b94ca82f8221e1cebc7b81a540534",
+    "semantic_hash": "6c4b94ca82f8221e1cebc7b81a540534"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/observer/orm.py": {
+    "mtime": 1778861350.8707666,
+    "ast_hash": "18593cfb60bce1e96ff6f1b9ea60cdb5",
+    "semantic_hash": "18593cfb60bce1e96ff6f1b9ea60cdb5"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/observer/schema.py": {
+    "mtime": 1778861390.1281383,
+    "ast_hash": "f3e337ac84b9ee7d95a32697804e0849",
+    "semantic_hash": "f3e337ac84b9ee7d95a32697804e0849"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/observer/__init__.py": {
+    "mtime": 1778861586.9500105,
+    "ast_hash": "ac9e14f74d788a2ff01ec2ad40380de2",
+    "semantic_hash": "ac9e14f74d788a2ff01ec2ad40380de2"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/observer/repository.py": {
+    "mtime": 1778861747.6255753,
+    "ast_hash": "59ff44778d41e5cd3e44fea469986196",
+    "semantic_hash": "59ff44778d41e5cd3e44fea469986196"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/observer/main.py": {
+    "mtime": 1778885843.302859,
+    "ast_hash": "90803653dd30d6daa2ad6103e89dfef1",
+    "semantic_hash": "90803653dd30d6daa2ad6103e89dfef1"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/observer/app.py": {
+    "mtime": 1778886315.0942242,
+    "ast_hash": "d2c5fdc5f62348a1cbb45bb9b1b17e9c",
+    "semantic_hash": "d2c5fdc5f62348a1cbb45bb9b1b17e9c"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/orm.py": {
+    "mtime": 1778861987.5839007,
+    "ast_hash": "460d2c38e36d6accd92a9d38fd5ae3f6",
+    "semantic_hash": "460d2c38e36d6accd92a9d38fd5ae3f6"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/schema.py": {
+    "mtime": 1778862016.4391797,
+    "ast_hash": "6218c9e9653ca528772ade63396c43bb",
+    "semantic_hash": "6218c9e9653ca528772ade63396c43bb"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/__init__.py": {
+    "mtime": 1778862124.5792239,
+    "ast_hash": "85f6d18cda95390faf5d27683869f3f5",
+    "semantic_hash": "85f6d18cda95390faf5d27683869f3f5"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/strategies.py": {
+    "mtime": 1778862215.742103,
+    "ast_hash": "34ff2ed8d9e5195389cfc2abad9f9036",
+    "semantic_hash": "34ff2ed8d9e5195389cfc2abad9f9036"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/repository.py": {
+    "mtime": 1778863513.345569,
+    "ast_hash": "56e6648a6ec448d27d059e0addcfbf64",
+    "semantic_hash": "56e6648a6ec448d27d059e0addcfbf64"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/app.py": {
+    "mtime": 1778865031.9999363,
+    "ast_hash": "052e43b5d4074fe800cac821b1b2bfa2",
+    "semantic_hash": "052e43b5d4074fe800cac821b1b2bfa2"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/observer_client.py": {
+    "mtime": 1778865236.5674376,
+    "ast_hash": "3f1e594243fce01818b6050fbb4a19fc",
+    "semantic_hash": "3f1e594243fce01818b6050fbb4a19fc"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/service.py": {
+    "mtime": 1778865293.3041213,
+    "ast_hash": "3730c324c8304cf3beb8dc4f9ab8cfed",
+    "semantic_hash": "3730c324c8304cf3beb8dc4f9ab8cfed"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/senate_ledger/main.py": {
+    "mtime": 1778885330.4036674,
+    "ast_hash": "f98ff2f15c9d2cc900d347cb1d0e07a1",
+    "semantic_hash": "f98ff2f15c9d2cc900d347cb1d0e07a1"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/harness/agenda_parser.py": {
+    "mtime": 1778862574.6285574,
+    "ast_hash": "d6396fcf5fba24a8ac1f1ca38bcb8be9",
+    "semantic_hash": "d6396fcf5fba24a8ac1f1ca38bcb8be9"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/harness/endpoints_parser.py": {
+    "mtime": 1778862581.5076237,
+    "ast_hash": "f339e2c947f6675594207c3a27ddac22",
+    "semantic_hash": "f339e2c947f6675594207c3a27ddac22"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/harness/file_watcher.py": {
+    "mtime": 1778862674.5365179,
+    "ast_hash": "07bfef66a719c715df209ca5e71664c0",
+    "semantic_hash": "07bfef66a719c715df209ca5e71664c0"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/harness/inbox.py": {
+    "mtime": 1778862674.5355177,
+    "ast_hash": "a830f55eb51b81475a3581c78586a6ca",
+    "semantic_hash": "a830f55eb51b81475a3581c78586a6ca"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/harness/__init__.py": {
+    "mtime": 1778862670.8524823,
+    "ast_hash": "6429bab1135e213fe6fbd7abc6536aa4",
+    "semantic_hash": "6429bab1135e213fe6fbd7abc6536aa4"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/harness/dual_writer.py": {
+    "mtime": 1778862689.7366638,
+    "ast_hash": "c9f68ee499ae7055561d524f209ee71e",
+    "semantic_hash": "c9f68ee499ae7055561d524f209ee71e"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/harness/main.py": {
+    "mtime": 1778883083.8935328,
+    "ast_hash": "6a1c8a63841efda67a68432f8683f9fc",
+    "semantic_hash": "6a1c8a63841efda67a68432f8683f9fc"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/wizard/seed.py": {
+    "mtime": 1778861913.07618,
+    "ast_hash": "a4195ace5bb13f5299cd46f45f1fea9e",
+    "semantic_hash": "a4195ace5bb13f5299cd46f45f1fea9e"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/wizard/main.py": {
+    "mtime": 1778861942.525465,
+    "ast_hash": "2733e092edefac36b48730da8656a42f",
+    "semantic_hash": "2733e092edefac36b48730da8656a42f"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/wizard/__init__.py": {
+    "mtime": 1778861946.3905025,
+    "ast_hash": "3a2b7229ffb11449cc0922ed3b695748",
+    "semantic_hash": "3a2b7229ffb11449cc0922ed3b695748"
+  },
+  "/home/thibault/code/conclave/platform/src/conclave_platform/wizard/templates.py": {
+    "mtime": 1778861996.4619865,
+    "ast_hash": "40045bd4bd3674bbaf666c690a4d3c93",
+    "semantic_hash": "40045bd4bd3674bbaf666c690a4d3c93"
+  },
+  "/home/thibault/code/conclave/platform/tests/__init__.py": {
+    "mtime": 1778860328.6133168,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/__init__.py": {
+    "mtime": 1778860329.655326,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_core_config.py": {
+    "mtime": 1778860337.5273955,
+    "ast_hash": "4e52e31df0a92886ab2bec11096a7c23",
+    "semantic_hash": "4e52e31df0a92886ab2bec11096a7c23"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_core_events.py": {
+    "mtime": 1778860347.9814878,
+    "ast_hash": "f2066b375ddea3c14e428ff8f31f7bac",
+    "semantic_hash": "f2066b375ddea3c14e428ff8f31f7bac"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_core_models.py": {
+    "mtime": 1778860464.4265273,
+    "ast_hash": "a4a5d3b9e60292beb14d32004241ed77",
+    "semantic_hash": "a4a5d3b9e60292beb14d32004241ed77"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_adapter_interfaces.py": {
+    "mtime": 1778860651.0802233,
+    "ast_hash": "111d7e57d86bb3bf4b2be7d9c14515a6",
+    "semantic_hash": "111d7e57d86bb3bf4b2be7d9c14515a6"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_bus_inmemory.py": {
+    "mtime": 1778860788.1244867,
+    "ast_hash": "f901b2bb7518ad8c378f50c412c63662",
+    "semantic_hash": "f901b2bb7518ad8c378f50c412c63662"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_docs_github_issues.py": {
+    "mtime": 1778860878.0583222,
+    "ast_hash": "94bf496e0f1e45188c30ff1e78dd1abd",
+    "semantic_hash": "94bf496e0f1e45188c30ff1e78dd1abd"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_docs_inmemory.py": {
+    "mtime": 1778860901.3445392,
+    "ast_hash": "db3daecdde6bff6f4ff10654599344d4",
+    "semantic_hash": "db3daecdde6bff6f4ff10654599344d4"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_notify.py": {
+    "mtime": 1778861024.0506866,
+    "ast_hash": "4f9d6ef2f83d061342ba6df70f38b344",
+    "semantic_hash": "4f9d6ef2f83d061342ba6df70f38b344"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_ci_github_actions.py": {
+    "mtime": 1778861103.322431,
+    "ast_hash": "0929293f79449ef718c7a4f7a59d7e8d",
+    "semantic_hash": "0929293f79449ef718c7a4f7a59d7e8d"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_repo_local_git.py": {
+    "mtime": 1778861152.309892,
+    "ast_hash": "df8c09237a98dc07f6f838c153622894",
+    "semantic_hash": "df8c09237a98dc07f6f838c153622894"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_runtime_compose.py": {
+    "mtime": 1778861358.8708422,
+    "ast_hash": "a2360b2b78e8bbcfb874c57001ccf5ad",
+    "semantic_hash": "a2360b2b78e8bbcfb874c57001ccf5ad"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_stub_adapters.py": {
+    "mtime": 1778861495.5381374,
+    "ast_hash": "4a2a4113c56d4798637ce7bcf5312827",
+    "semantic_hash": "4a2a4113c56d4798637ce7bcf5312827"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_observer_repository.py": {
+    "mtime": 1778861545.7036138,
+    "ast_hash": "59315fe34fdce9c9f4d2aa88cc0d322f",
+    "semantic_hash": "59315fe34fdce9c9f4d2aa88cc0d322f"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_observer_app.py": {
+    "mtime": 1778861564.573793,
+    "ast_hash": "29dfb6ddc0325a1a35a906961baea596",
+    "semantic_hash": "29dfb6ddc0325a1a35a906961baea596"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_wizard.py": {
+    "mtime": 1778861964.7366798,
+    "ast_hash": "14869e1a6f3871b68e37ed36a2816453",
+    "semantic_hash": "14869e1a6f3871b68e37ed36a2816453"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_senate_strategies.py": {
+    "mtime": 1778862183.0917883,
+    "ast_hash": "2ab2ff92af306c67b81fbd1fdad805e9",
+    "semantic_hash": "2ab2ff92af306c67b81fbd1fdad805e9"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_senate_app.py": {
+    "mtime": 1778862220.4681487,
+    "ast_hash": "3c12dd53a40d5304ee1d17d0c472d597",
+    "semantic_hash": "3c12dd53a40d5304ee1d17d0c472d597"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_mcp_servers.py": {
+    "mtime": 1778862450.3533623,
+    "ast_hash": "f010e9376c816e2ceb37019d9532a5e4",
+    "semantic_hash": "f010e9376c816e2ceb37019d9532a5e4"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_harness.py": {
+    "mtime": 1778862736.0971093,
+    "ast_hash": "770f019007286ab14ebe309242d067c3",
+    "semantic_hash": "770f019007286ab14ebe309242d067c3"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_docs_sqlite.py": {
+    "mtime": 1778863688.0373836,
+    "ast_hash": "2106fede00e8d7d9a212d789f489747c",
+    "semantic_hash": "2106fede00e8d7d9a212d789f489747c"
+  },
+  "/home/thibault/code/conclave/platform/tests/unit/test_cli_pi.py": {
+    "mtime": 1778884116.542012,
+    "ast_hash": "27c0fe973d3bc6bcba368a82f5b2ed8e",
+    "semantic_hash": "27c0fe973d3bc6bcba368a82f5b2ed8e"
+  },
+  "/home/thibault/code/conclave/platform/tests/integration/__init__.py": {
+    "mtime": 1778862821.2089267,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/thibault/code/conclave/platform/tests/integration/test_e2e_in_process.py": {
+    "mtime": 1778862848.5731895,
+    "ast_hash": "e8ac52ad33da9812075b0e1b55a3810b",
+    "semantic_hash": "e8ac52ad33da9812075b0e1b55a3810b"
+  },
+  "/home/thibault/code/conclave/platform/tests/smoke/__init__.py": {
+    "mtime": 1778862820.1239164,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/thibault/code/conclave/platform/scripts/wake_founder.py": {
+    "mtime": 1778883751.332601,
+    "ast_hash": "b9c5a926d03a86068630e1740c6a45b7",
+    "semantic_hash": "b9c5a926d03a86068630e1740c6a45b7"
+  },
+  "/home/thibault/code/conclave/platform/scripts/pod_spawner.py": {
+    "mtime": 1778884986.3225136,
+    "ast_hash": "bf497b678b4e97cdf4596ba12a382705",
+    "semantic_hash": "bf497b678b4e97cdf4596ba12a382705"
+  },
+  "/home/thibault/code/conclave/platform/scripts/demo_scenario.py": {
+    "mtime": 1778884964.6622522,
+    "ast_hash": "2dd6b7a9616f797ed597e38579433dd9",
+    "semantic_hash": "2dd6b7a9616f797ed597e38579433dd9"
+  },
+  "/home/thibault/code/conclave/infra/pod-mcp-config.json": {
+    "mtime": 1778883132.673123,
+    "ast_hash": "8269ea917a8cfbdf3685762e35317e76",
+    "semantic_hash": "8269ea917a8cfbdf3685762e35317e76"
+  },
+  "/home/thibault/code/conclave/ui/eslint.config.js": {
+    "mtime": 1778861882.3995366,
+    "ast_hash": "0355276bc79439afe3c53e3a2470ca1e",
+    "semantic_hash": "0355276bc79439afe3c53e3a2470ca1e"
+  },
+  "/home/thibault/code/conclave/ui/tsconfig.app.json": {
+    "mtime": 1778861882.4004807,
+    "ast_hash": "136630b5accce1ca50663df229534a26",
+    "semantic_hash": "136630b5accce1ca50663df229534a26"
+  },
+  "/home/thibault/code/conclave/ui/tsconfig.json": {
+    "mtime": 1778861882.4005466,
+    "ast_hash": "a3d39fa780ebff65444de257f291ce6c",
+    "semantic_hash": "a3d39fa780ebff65444de257f291ce6c"
+  },
+  "/home/thibault/code/conclave/ui/tsconfig.node.json": {
+    "mtime": 1778861882.400601,
+    "ast_hash": "70bdd0a673bcfc0e828080b306e7c680",
+    "semantic_hash": "70bdd0a673bcfc0e828080b306e7c680"
+  },
+  "/home/thibault/code/conclave/ui/package.json": {
+    "mtime": 1778861901.2500656,
+    "ast_hash": "6a7c860f35e55789deb05f08c8b91078",
+    "semantic_hash": "6a7c860f35e55789deb05f08c8b91078"
+  },
+  "/home/thibault/code/conclave/ui/vite.config.ts": {
+    "mtime": 1778863460.1240585,
+    "ast_hash": "19010ce9db39876291b146b8d93e9274",
+    "semantic_hash": "19010ce9db39876291b146b8d93e9274"
+  },
+  "/home/thibault/code/conclave/ui/src/main.tsx": {
+    "mtime": 1778862130.801284,
+    "ast_hash": "916849ba72adde8f62e359562c07473b",
+    "semantic_hash": "916849ba72adde8f62e359562c07473b"
+  },
+  "/home/thibault/code/conclave/ui/src/App.tsx": {
+    "mtime": 1778862130.7702837,
+    "ast_hash": "a4974573a57f4fa5f3251bf9a0403951",
+    "semantic_hash": "a4974573a57f4fa5f3251bf9a0403951"
+  },
+  "/home/thibault/code/conclave/ui/src/api/client.ts": {
+    "mtime": 1778862130.7372835,
+    "ast_hash": "81b39276a7a1bee4c6fac206b22df8ea",
+    "semantic_hash": "81b39276a7a1bee4c6fac206b22df8ea"
+  },
+  "/home/thibault/code/conclave/ui/src/api/observer.ts": {
+    "mtime": 1778886832.5924807,
+    "ast_hash": "47b935ee6554cebf58fd6f4e5e3a0de7",
+    "semantic_hash": "47b935ee6554cebf58fd6f4e5e3a0de7"
+  },
+  "/home/thibault/code/conclave/ui/src/views/Tabularium.tsx": {
+    "mtime": 1778862130.8612845,
+    "ast_hash": "092ef2bc52196396c71985f1d5c6923a",
+    "semantic_hash": "092ef2bc52196396c71985f1d5c6923a"
+  },
+  "/home/thibault/code/conclave/ui/src/views/Council.tsx": {
+    "mtime": 1778862130.8402843,
+    "ast_hash": "60076a3bd5d32e082d31c50a0b798e6d",
+    "semantic_hash": "60076a3bd5d32e082d31c50a0b798e6d"
+  },
+  "/home/thibault/code/conclave/ui/src/views/ExileDistrict.tsx": {
+    "mtime": 1778862130.8462844,
+    "ast_hash": "e5f79e8e2c5ae2cb244801ae8bca4ebe",
+    "semantic_hash": "e5f79e8e2c5ae2cb244801ae8bca4ebe"
+  },
+  "/home/thibault/code/conclave/ui/src/views/Wizard.tsx": {
+    "mtime": 1778862130.8772848,
+    "ast_hash": "04029a8ceebe6e7f83814e7d42ec0b28",
+    "semantic_hash": "04029a8ceebe6e7f83814e7d42ec0b28"
+  },
+  "/home/thibault/code/conclave/ui/src/views/CharterEditor.tsx": {
+    "mtime": 1778862130.8342843,
+    "ast_hash": "2c4a9587d48658e46f31d6085fb65768",
+    "semantic_hash": "2c4a9587d48658e46f31d6085fb65768"
+  },
+  "/home/thibault/code/conclave/ui/src/views/Forum.tsx": {
+    "mtime": 1778886862.5935335,
+    "ast_hash": "75040f96748893851e357c21fc094207",
+    "semantic_hash": "75040f96748893851e357c21fc094207"
+  },
+  "/home/thibault/code/conclave/ui/src/components/Nav.tsx": {
+    "mtime": 1778862130.7812839,
+    "ast_hash": "6dfd56834a7bb9dd20df5d1fd191a203",
+    "semantic_hash": "6dfd56834a7bb9dd20df5d1fd191a203"
+  },
+  "/home/thibault/code/conclave/ui/src/components/StoneTablet.tsx": {
+    "mtime": 1778862130.798284,
+    "ast_hash": "6083c04a39b5b345a777390aea5c2d77",
+    "semantic_hash": "6083c04a39b5b345a777390aea5c2d77"
+  },
+  "/home/thibault/code/conclave/ui/src/components/Sprite.tsx": {
+    "mtime": 1778862130.7942839,
+    "ast_hash": "a5a4878d266cd4378be9f82ca440503f",
+    "semantic_hash": "a5a4878d266cd4378be9f82ca440503f"
+  },
+  "/home/thibault/code/conclave/ui/src/components/ActivityPanel.tsx": {
+    "mtime": 1778886857.0965228,
+    "ast_hash": "cea7c399e6961cea4f51d2a0872223e0",
+    "semantic_hash": "cea7c399e6961cea4f51d2a0872223e0"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/0d/a323607c99e959f45e4e546d6c3249b8b4e2cddb5bdbf48144a327b6a9071dff50fa253ddeac9019bcafcc9a2181a2030c9d901b9cff9a637063b8b8272364-exec": {
+    "mtime": 1778863400.3532782,
+    "ast_hash": "f32913126e263764b55ea691ab3f875a",
+    "semantic_hash": "f32913126e263764b55ea691ab3f875a"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/0e/a443ab6e5c60dd93189883e1bd3e3bc2aace79ec20d14e5b8f53b9408ce0abe0645af40704c67c58edd06517d181a6912c45453f92e177f1e91dca35aa3007-exec": {
+    "mtime": 1778863400.3533638,
+    "ast_hash": "6b5e5df2070db461465704e09f257fba",
+    "semantic_hash": "6b5e5df2070db461465704e09f257fba"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/17/43838285ac812472efbf13c60f465ca08b808637cf3681d8f7bb7ffd002e227839eb08b68626f22b57a5535827b705d9817f7d15eba447215357eab0e124f6-exec": {
+    "mtime": 1778863400.3531258,
+    "ast_hash": "32306596b82c21bf9ab7949435d4cd06",
+    "semantic_hash": "32306596b82c21bf9ab7949435d4cd06"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/2c/04efdcab887ff94f6adbbd70d0470dbc29b17ebd7c823e8eb3be5320e913cf25af2db514cd6de92beacab7051e2e497eb52dd04562ca28b57d018b05ba7001-exec": {
+    "mtime": 1778863400.4195592,
+    "ast_hash": "8d9360de8c320e7e3840967ff8ddd653",
+    "semantic_hash": "8d9360de8c320e7e3840967ff8ddd653"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/2e/d200088e247944734bc313e804e62eb2263c3be1ab282828441b939deb19dd490dee60e2e292d54aa4a115caf5e49988f91f98873ba03721ad3c5b35850fd9": {
+    "mtime": 1778863400.523991,
+    "ast_hash": "04dce93c650682b5c1111020bf1fd43f",
+    "semantic_hash": "04dce93c650682b5c1111020bf1fd43f"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/30/b69022d909bb0ca1ace289c85fc52ad21d2702220aef142b43d234c769db2731523e787986d7f9e279a84adb0467991daa6be0076cb8ff47fbb830d4a934a4-exec": {
+    "mtime": 1778863400.3084502,
+    "ast_hash": "ec5fa9e6e8029bf6611634c978dd6e22",
+    "semantic_hash": "ec5fa9e6e8029bf6611634c978dd6e22"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/32/2a3fdcbdc0ab2240acda547abe636d51f7f2114200491f7fc66c4353d43d37a4052df0d32f29ede80c8a768d312efae8ed28639f55c2e5a678f306a45986f9-exec": {
+    "mtime": 1778863400.2534842,
+    "ast_hash": "ab7317a95d1f704cb183d7c438a3e890",
+    "semantic_hash": "ab7317a95d1f704cb183d7c438a3e890"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/3b/a8ecbebb45d5b46cf14a9287abcb3d65c59bd759a19d70838af785a4ddfc02b1109334d7f0b7224bf518e815eeaee9661c435caa0b5b0a63773fb4508fab84-exec": {
+    "mtime": 1778863400.3534665,
+    "ast_hash": "49733797030660b081f981653a25402b",
+    "semantic_hash": "49733797030660b081f981653a25402b"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/45/c71ebc59854c7ff76b564a3e847480cec698bfbf8a0df9efcc6bab437dfd32b92779556d6c5ea7f6fd46caa8a5948143387ac1db26cebb8d192f8fafc5c60c": {
+    "mtime": 1778863400.4068487,
+    "ast_hash": "1ba2f9cb72680bbf3dae846ef2f95b82",
+    "semantic_hash": "1ba2f9cb72680bbf3dae846ef2f95b82"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/5f/ff4958fc3da89412fb8815a9dd379d716e824d91059ad5fe29ebc4f4331540723ed12f3176e4f03d51fd6aa903eafb18bcf4b4abeb547e940c5793788cc4db-exec": {
+    "mtime": 1778863400.393678,
+    "ast_hash": "4c56b5a6bf64f83f94faa1a7c8cb8803",
+    "semantic_hash": "4c56b5a6bf64f83f94faa1a7c8cb8803"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/6d/d11b8a6784c0a672e582310a3339388bf2ad090e85246c37ec596f63c8a21b746290be97d8129fb1ff3ca09cca252d671011c0e0f3434a26da644dedf4d65e-exec": {
+    "mtime": 1778863400.5919797,
+    "ast_hash": "77f2382cbdcd057ac7a1b23e43363bca",
+    "semantic_hash": "77f2382cbdcd057ac7a1b23e43363bca"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/7f/fee6843ca2a0e770beaa0aa9653befdd07f50f89ab30debf89505b4ddc74b5e6a6a3a4cdb086c5fc2353ada1997bd6bedf56e9e5ab15a5fe8f60504f3237fd-exec": {
+    "mtime": 1778863400.3779166,
+    "ast_hash": "503ab1a1ada32bbd8efe83aa1066d06e",
+    "semantic_hash": "503ab1a1ada32bbd8efe83aa1066d06e"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/8f/805d00da9bac31f60875d95e28d902e84bef1116d7bd2d5daf1e0234d78fb0e2dc3fab72171dadb0d9293b0268901aaea50bf9295da4ed11d7720c6ab926e6-exec": {
+    "mtime": 1778863400.4563904,
+    "ast_hash": "a50d4fe4891d0595b84e4d8a5f95c226",
+    "semantic_hash": "a50d4fe4891d0595b84e4d8a5f95c226"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/98/1f4ca79649501ec6e85652e657b04b12fbe9d29159f896220aeb78c3e08bd40511875b2ff9e2b8205a09f7c91c6abc50785f9a85007752125c1fed7cac4483-exec": {
+    "mtime": 1778863400.393057,
+    "ast_hash": "c788275964548af6771c88b30fbf5825",
+    "semantic_hash": "c788275964548af6771c88b30fbf5825"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/c2/912f5fb0f8f3bfc9ac2e07a816206bf1db1545861778cf02bc28fafa063a4f4d1310281c6c9b9d73b674eb4273650d3e13cd8421a71f02bbeb8ea586e14704-exec": {
+    "mtime": 1778863400.3687525,
+    "ast_hash": "589f02c7d2e1b0560507b44d2952b69d",
+    "semantic_hash": "589f02c7d2e1b0560507b44d2952b69d"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/c7/9bee63ecfd7dc01d1f318fb8412cd39e2b185130065dc356d748150b89932acf8459e5eb0b3399f1d24970be5dad668cffa75983652d0cde924195338b22ad-exec": {
+    "mtime": 1778863400.3680604,
+    "ast_hash": "1ccdcf9e4ae4a18e45d14c466a732c20",
+    "semantic_hash": "1ccdcf9e4ae4a18e45d14c466a732c20"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/ca/26fef6581cc551ed37150a2e070b644f2d3f5460c81873940af34afe020f22d9e97f9637ff4ad4174c07d27afc6be0176665b7a775e177afb3cee1b4c7377a-exec": {
+    "mtime": 1778863400.3993266,
+    "ast_hash": "eb4e282d94eb3fc0cd83014b7ceebf41",
+    "semantic_hash": "eb4e282d94eb3fc0cd83014b7ceebf41"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/d6/a6bb34e61385ae6df7093af1364b7bc5e322b894f411a83f1e364d2fc128cb8a276529fe59e67b9d12f98e8aec53ee0b9c142f22bba52dc1047ecb37187b04-exec": {
+    "mtime": 1778863400.4072528,
+    "ast_hash": "1c576ce1e20e5ff0d360bd4615a0e5b9",
+    "semantic_hash": "1c576ce1e20e5ff0d360bd4615a0e5b9"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/dc/fccd36de3c22a395e97e8eb226bd83c5d9ed42ffbc57e06a35f98cd1fa20e0f410537e96f7389bd7cb65ec7f55b943926d6c6f0d523f28d957cdab48be4f57-exec": {
+    "mtime": 1778863400.5920155,
+    "ast_hash": "a66f62644aee3142f36b1f14b44bd273",
+    "semantic_hash": "a66f62644aee3142f36b1f14b44bd273"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/e0/486f0c752ad4feafd83ad116e95319e6d07957ae8c62dd021bd678174b87683d9df4166be6ab3bb06a484fe66db89704441768715d52e601ebc8ed7e4b2b39-exec": {
+    "mtime": 1778863400.352996,
+    "ast_hash": "8d748ed92904c4b1812a100797a3503c",
+    "semantic_hash": "8d748ed92904c4b1812a100797a3503c"
+  },
+  "/home/thibault/code/conclave/ui/.pnpm-store/v11/files/fa/4e05b3f9d5fbd1c3925be094b88c138b491cf00e13ed4171edaa51f1ee45b45ccfbaf971a469a1ca74e4da6562d02bd7fe696de99cb222b1f90022daa5e1fe": {
+    "mtime": 1778863400.3862922,
+    "ast_hash": "32d2aea799f34a237512b729f5e11779",
+    "semantic_hash": "32d2aea799f34a237512b729f5e11779"
+  },
+  "/home/thibault/code/conclave/CLAUDE.md": {
+    "mtime": 1778859815.442416,
+    "ast_hash": "81b108eb1e655f7b953906f65ff51853",
+    "semantic_hash": "81b108eb1e655f7b953906f65ff51853"
+  },
+  "/home/thibault/code/conclave/primitives.md": {
+    "mtime": 1778861965.9286914,
+    "ast_hash": "e8fd12c83e9e30e80ed1059e48677d67",
+    "semantic_hash": "e8fd12c83e9e30e80ed1059e48677d67"
+  },
+  "/home/thibault/code/conclave/voting-strategies.md": {
+    "mtime": 1778862029.2333033,
+    "ast_hash": "586e73321b2b8ea4a31fe1d98a067b84",
+    "semantic_hash": "586e73321b2b8ea4a31fe1d98a067b84"
+  },
+  "/home/thibault/code/conclave/charter-template.md": {
+    "mtime": 1778862043.0314367,
+    "ast_hash": "ca0d4efa2d9f859687fd1dd459a541c5",
+    "semantic_hash": "ca0d4efa2d9f859687fd1dd459a541c5"
+  },
+  "/home/thibault/code/conclave/iusiurandum.md": {
+    "mtime": 1778884815.7124538,
+    "ast_hash": "744c5f20bcc63ff0d832ffb7ada4b67e",
+    "semantic_hash": "744c5f20bcc63ff0d832ffb7ada4b67e"
+  },
+  "/home/thibault/code/conclave/spec/brainstrom.md": {
+    "mtime": 1778857441.8741472,
+    "ast_hash": "1527e9184f1f307a25bcadef5d99f408",
+    "semantic_hash": "1527e9184f1f307a25bcadef5d99f408"
+  },
+  "/home/thibault/code/conclave/spec/forum-viz.md": {
+    "mtime": 1778886642.1844556,
+    "ast_hash": "8f770318863b3e51c44c657d293f8d56",
+    "semantic_hash": "8f770318863b3e51c44c657d293f8d56"
+  },
+  "/home/thibault/code/conclave/spec/v1-acceptance.md": {
+    "mtime": 1778887334.0044913,
+    "ast_hash": "bebe6a13ff3d07a7d5b00c3dc63fea5e",
+    "semantic_hash": "bebe6a13ff3d07a7d5b00c3dc63fea5e"
+  },
+  "/home/thibault/code/conclave/platform/README.md": {
+    "mtime": 1778860179.8050778,
+    "ast_hash": "d41d8cd98f00b204e9800998ecf8427e",
+    "semantic_hash": "d41d8cd98f00b204e9800998ecf8427e"
+  },
+  "/home/thibault/code/conclave/personae/Cicero.md": {
+    "mtime": 1778862208.2860312,
+    "ast_hash": "f3c9ec5b682ff7abaa9a7645fe7b70d6",
+    "semantic_hash": "f3c9ec5b682ff7abaa9a7645fe7b70d6"
+  },
+  "/home/thibault/code/conclave/personae/Cato.md": {
+    "mtime": 1778862219.258137,
+    "ast_hash": "9db520055cb3afa704467e44be460617",
+    "semantic_hash": "9db520055cb3afa704467e44be460617"
+  },
+  "/home/thibault/code/conclave/personae/Cassius.md": {
+    "mtime": 1778862229.8962395,
+    "ast_hash": "49e251765d400014336f37cd9a6b75fd",
+    "semantic_hash": "49e251765d400014336f37cd9a6b75fd"
+  },
+  "/home/thibault/code/conclave/personae/Brutus.md": {
+    "mtime": 1778862240.5833426,
+    "ast_hash": "438a2118ec56b3e61d033a1f2b155104",
+    "semantic_hash": "438a2118ec56b3e61d033a1f2b155104"
+  },
+  "/home/thibault/code/conclave/personae/Crassus.md": {
+    "mtime": 1778862250.69344,
+    "ast_hash": "5ef133063f4bf1e490b9e923106a3d41",
+    "semantic_hash": "5ef133063f4bf1e490b9e923106a3d41"
+  },
+  "/home/thibault/code/conclave/personae/Seneca.md": {
+    "mtime": 1778862261.5165443,
+    "ast_hash": "bc9b8c50621d0463cfdd30205407eb9b",
+    "semantic_hash": "bc9b8c50621d0463cfdd30205407eb9b"
+  },
+  "/home/thibault/code/conclave/personae/Pliny.md": {
+    "mtime": 1778862276.1236851,
+    "ast_hash": "ed56003ec2a081f26f2c0eb565914986",
+    "semantic_hash": "ed56003ec2a081f26f2c0eb565914986"
+  },
+  "/home/thibault/code/conclave/personae/Tacitus.md": {
+    "mtime": 1778862286.4157841,
+    "ast_hash": "b7b136b73aea68bfb76c1015803c87db",
+    "semantic_hash": "b7b136b73aea68bfb76c1015803c87db"
+  },
+  "/home/thibault/code/conclave/personae/Antony.md": {
+    "mtime": 1778862300.6239212,
+    "ast_hash": "df588117c6db7d011b2ff61f9126437d",
+    "semantic_hash": "df588117c6db7d011b2ff61f9126437d"
+  },
+  "/home/thibault/code/conclave/personae/Augustus.md": {
+    "mtime": 1778862310.4560158,
+    "ast_hash": "c0f2e480cc49cbd030f9723275bb8a54",
+    "semantic_hash": "c0f2e480cc49cbd030f9723275bb8a54"
+  },
+  "/home/thibault/code/conclave/personae/Gracchus.md": {
+    "mtime": 1778862321.7341244,
+    "ast_hash": "515e0fd94f92a62e30a791e6435bcbe4",
+    "semantic_hash": "515e0fd94f92a62e30a791e6435bcbe4"
+  },
+  "/home/thibault/code/conclave/personae/Vesta.md": {
+    "mtime": 1778862332.6252294,
+    "ast_hash": "62f091e6c5a14f0c670bc7c59161bbe2",
+    "semantic_hash": "62f091e6c5a14f0c670bc7c59161bbe2"
+  },
+  "/home/thibault/code/conclave/infra/compose.yaml": {
+    "mtime": 1778883148.1893106,
+    "ast_hash": "5ee573ec6aab1e2fcd026700c6d3d6f4",
+    "semantic_hash": "5ee573ec6aab1e2fcd026700c6d3d6f4"
+  },
+  "/home/thibault/code/conclave/ui/README.md": {
+    "mtime": 1778861882.3993797,
+    "ast_hash": "f6e3faf55d738cf2affe1b44195f27cf",
+    "semantic_hash": "f6e3faf55d738cf2affe1b44195f27cf"
+  },
+  "/home/thibault/code/conclave/ui/index.html": {
+    "mtime": 1778862083.969832,
+    "ast_hash": "3663b15c7fbb2910b47ed72716891283",
+    "semantic_hash": "3663b15c7fbb2910b47ed72716891283"
+  }
+}

@@ -8,6 +8,134 @@ that must hold during and around it.
 
 ---
 
+## Operating principle: ship small, expand on demand
+
+Conclave is **opinionatedly agile**. The platform's prompts, defaults, and
+review surfaces are tuned to push agents toward the smallest thing that
+delivers value, then expand only when a concrete need shows up. No
+big-bang architecture, no speculative pods, no waterfall — *especially not
+in the founder's first 30 minutes*.
+
+What that means for the founder agent (encoded in `iusiurandum.md` and the
+charter template):
+
+- **Ship a working v0 first.** When a proclamation arrives, the founder
+  proposes the *fewest* peers it can imagine that, end-to-end, deliver
+  *something* the emperor could see. For a "Netflix clone", v0 is a
+  single `web` pod serving one hardcoded video with a fake login — not
+  three pods with proper auth, catalog, and streaming services. Two
+  peers max for the first iteration; one is fine if it works.
+- **New pods only when an existing pod hits a real wall.** Reasons to
+  propose a peer: an agent's workspace is getting too tangled to reason
+  about; a service needs to scale or restart independently; a contract
+  boundary is becoming load-bearing. *Not* reasons: "auth deserves its
+  own service in theory", "we should separate concerns up front".
+- **Iterate in tight loops.** Council → ADR → ship → observe → council.
+  An ADR that opens at 22:00 and closes at 22:08 with a 3-line summary
+  is doing better work than one that opens at 22:00 and is still being
+  drafted at 22:45.
+- **Reject pre-decided architectures.** If the founder's first
+  proposal looks like "let's spin up 6 pods modelled on Netflix's
+  micro-services", the platform should make that uncomfortable: the
+  charter template asks "what specific failure today justifies this
+  pod?" and the council strategy defaults to `consensus_omnium` for any
+  initial-architecture proposal with >2 peers, forcing dissenters to
+  speak up.
+- **`senate.propose_completion` is a first-class verb.** The founder is
+  expected to call it the moment the v0 mandate is met, not after every
+  conceivable improvement is shipped. Subsequent proclamations grow the
+  system.
+
+What that means for the prompts and platform:
+
+- The founder's iusiurandum opens with "Ship the smallest working slice
+  that fulfils the proclamation, then stop and observe." before any
+  language about peers and councils.
+- The charter template's `## Why this pod and not a chunk of an existing
+  pod?` field is required, not optional. Empty answer → senate
+  auto-rejects.
+- `state.platform_info` returns a `project_age_seconds` field; if the
+  founder proposes more than 2 peers within the first 60s of project
+  age, the senate logs a `velocity_warning` ADR (informational, doesn't
+  block) and the Forum surfaces it.
+- The acceptance demo (§0) checks that the founder ships **a running v0
+  with one or two pods**, then proposes additions in later iterations —
+  not that it nails the final 3-5-pod architecture on the first try.
+
+This isn't a soft suggestion in the docs. It's an *opinion the platform
+holds*, and the design of every prompt, default strategy, ADR template,
+and senate band UI is meant to reinforce it.
+
+---
+
+## Verification protocol: how I (Claude) actually check each criterion
+
+Every criterion in this spec is checked by **driving the running stack with
+the Playwright MCP and the Chrome DevTools MCP**, not by reading source or
+guessing. The pattern, per criterion:
+
+1. `mcp__playwright__browser_navigate` to the relevant URL (Forum or any
+   pod's service URL).
+2. `mcp__playwright__browser_take_screenshot` + `mcp__playwright__browser_snapshot`
+   (accessibility tree) for the visual state.
+3. `mcp__playwright__browser_console_messages` (level=error) to ensure no
+   unhandled errors fire.
+4. `mcp__playwright__browser_network_requests` to check the right API
+   calls happen with the right shapes.
+5. `mcp__chrome_devtools__list_console_messages` +
+   `mcp__chrome_devtools__list_network_requests` when I need fuller
+   devtools context — e.g. "did the SSE stream emit?", "did the React
+   render avoid a re-mount?", "did the Vite proxy hit observer:8000?".
+6. For reactivity criteria: stamp the screenshot time, take a second
+   screenshot N seconds later, diff the two, and confirm the change
+   happened within the budget.
+7. For "no leftover state": Playwright opens an incognito context so I
+   don't measure my own cached cruft.
+
+**Every checkbox in §1–§11 must be backed by a Playwright/DevTools
+recipe.** If a criterion can't be expressed as a sequence of MCP calls
+that pass/fail deterministically, it doesn't belong in the spec — rewrite
+it until it does.
+
+### Per-criterion verification recipe template
+
+```
+- [ ] CRITERION
+   - precondition:  state of the system before checking (e.g. "stack up, no proclamation sent")
+   - action:        the user action being simulated (navigate, click, type)
+   - check:         the assertion against the result (screenshot match, snapshot text, network shape)
+   - tools:         the MCP calls that perform the action and the check
+```
+
+I'll fill these in for the criteria below as I implement each. The
+template stays as the contract.
+
+### Eyes verification ground rules
+
+- I never claim a criterion passes from `curl` output alone. The user
+  doesn't see `curl`; they see the browser. Every visual criterion must
+  be confirmed by a screenshot or accessibility snapshot I personally
+  inspected.
+- For each fix I ship, I include a **before** screenshot (current broken
+  state) and an **after** screenshot (post-fix). Both go in the PR body
+  so the user can see what changed without rebooting the stack.
+- Reactivity is measured: I record an event timestamp from
+  `docker logs` and the timestamp of the screenshot that shows the
+  resulting UI change, and I include the delta. If it's >2s, the
+  criterion fails even if the UI eventually catches up.
+- Console errors are blockers. Any `error`-level console message during
+  the golden demo fails the run regardless of how nice the screenshots
+  look.
+
+### Graphify MCP support
+
+The Graphify MCP server is also wired (see `.mcp.json`). When I need to
+navigate the codebase to find which file owns a given behavior I'll lean
+on it via `query_graph` / `get_node` / `shortest_path` rather than grep —
+faster and the audit trail (EXTRACTED/INFERRED/AMBIGUOUS) keeps me honest.
+
+---
+
 ## 0. The golden demo
 
 A new user opens `http://localhost:5173` from a blank machine state. They
@@ -193,10 +321,22 @@ peer calls):
 ## 8. Shipping the Netflix clone
 
 This is the demoable end state — the platform's agents must produce a
-runnable system, not just talk about one:
+runnable system, not just talk about one. **Per the operating principle,
+v1 done is a working v0 first**, not a polished 5-pod architecture:
 
-- [ ] At least 3 pods host real running services (e.g., `auth`,
-      `catalog`, `web`).
+- [ ] **v0** ships within 8 minutes of proclamation: ONE pod (the
+      founder, or one peer) serving an HTML page on a host-mapped port
+      with a single hardcoded video playable in-browser and a fake
+      login. The user can see *something working* before the senate
+      gets fancy. Verified by `mcp__playwright__browser_navigate` to
+      the published port and a screenshot showing the video element.
+- [ ] **v1 expansion** happens *after* v0 is live and only when the
+      senate has at least one ADR justifying each new pod with a
+      concrete failure of the v0 design (e.g. "auth pod separated
+      because v0's login is a hardcoded credential check we can't
+      iterate on without redeploying the web pod"). At least 3 pods
+      host real running services at this stage, but each one points to
+      an ADR explaining *why it had to be its own pod*.
 - [ ] Each pod's container exposes its service on the conclave network.
 - [ ] The `web` pod serves an HTML page on a host-mapped port the user
       can open in a browser.

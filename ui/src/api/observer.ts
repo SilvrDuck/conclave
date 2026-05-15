@@ -98,3 +98,51 @@ export async function sendMandate(pod: string, goal: string): Promise<void> {
   const data = await postJson("/observer/control/mandate", { pod, goal });
   MandateAck.parse(data);
 }
+
+// ─── senate-ledger (proxied at /api/senate) ──────────────────────────────
+
+export const ProposalSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  proposer: z.string(),
+  strategy: z.string(),
+  payload: z.record(z.string(), z.unknown()),
+  affected: z.array(z.string()),
+  opened_at: z.string(),
+  deadline: z.string(),
+  outcome: z.string().nullable().optional(),
+  decided_at: z.string().nullable().optional(),
+  adr_id: z.string().nullable().optional(),
+});
+export type Proposal = z.infer<typeof ProposalSchema>;
+
+const ProposalsOut = z.object({ proposals: z.array(ProposalSchema) });
+
+export const AdrSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  body: z.string(),
+  affected_pods: z.array(z.string()),
+  proposal_id: z.string().nullable().optional(),
+  created_at: z.string(),
+});
+export type Adr = z.infer<typeof AdrSchema>;
+const AdrsOut = z.object({ adrs: z.array(AdrSchema) });
+
+async function getJsonSenate(path: string): Promise<unknown> {
+  const res = await fetch(`/api/senate${path}`);
+  if (!res.ok) {
+    throw new Error(`GET /api/senate${path} → ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function listOpenProposals(): Promise<Proposal[]> {
+  const data = await getJsonSenate("/proposals");
+  return ProposalsOut.parse(data).proposals;
+}
+
+export async function listAdrs(): Promise<Adr[]> {
+  const data = await getJsonSenate("/adrs");
+  return AdrsOut.parse(data).adrs;
+}
