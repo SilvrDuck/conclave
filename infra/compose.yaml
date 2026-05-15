@@ -1,0 +1,144 @@
+name: conclave
+
+services:
+  bus:
+    image: nats:2.10-alpine
+    container_name: conclave-bus
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+    networks: [conclave]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "4222"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+
+  observer:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-observer
+    command: ["conclave-observer"]
+    environment:
+      OBSERVER_DSN: sqlite+aiosqlite:////data/observer.db
+      OBSERVER_HOST: 0.0.0.0
+      OBSERVER_PORT: "8000"
+      BUS_URL: nats://bus:4222
+    ports:
+      - "8000:8000"
+    volumes:
+      - observer_data:/data
+    depends_on:
+      bus:
+        condition: service_healthy
+    networks: [conclave]
+
+  senate-ledger:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-senate-ledger
+    command: ["conclave-senate"]
+    environment:
+      SENATE_DSN: sqlite+aiosqlite:////data/senate.db
+      SENATE_HOST: 0.0.0.0
+      SENATE_PORT: "8001"
+      OBSERVER_URL: http://observer:8000
+      DOCS_KIND: ${DOCS_KIND:-inmemory}
+      REPO_FULL_NAME: ${REPO_FULL_NAME:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    ports:
+      - "8001:8001"
+    volumes:
+      - senate_data:/data
+    depends_on:
+      - observer
+    networks: [conclave]
+
+  mcp-coms:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-mcp-coms
+    command: ["conclave-mcp-coms"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8002"
+      BUS_URL: nats://bus:4222
+      OBSERVER_URL: http://observer:8000
+    ports:
+      - "8002:8002"
+    depends_on:
+      - bus
+      - observer
+    networks: [conclave]
+
+  mcp-senate:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-mcp-senate
+    command: ["conclave-mcp-senate"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8003"
+      SENATE_URL: http://senate-ledger:8001
+    ports:
+      - "8003:8003"
+    depends_on:
+      - senate-ledger
+    networks: [conclave]
+
+  mcp-decisions:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-mcp-decisions
+    command: ["conclave-mcp-decisions"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8004"
+      DOCS_KIND: ${DOCS_KIND:-inmemory}
+      REPO_FULL_NAME: ${REPO_FULL_NAME:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    ports:
+      - "8004:8004"
+    networks: [conclave]
+
+  mcp-state:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-mcp-state
+    command: ["conclave-mcp-state"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8005"
+      OBSERVER_URL: http://observer:8000
+    ports:
+      - "8005:8005"
+    depends_on:
+      - observer
+    networks: [conclave]
+
+  forum-ui:
+    image: node:24-alpine
+    container_name: conclave-forum-ui
+    working_dir: /app
+    command: ["sh", "-c", "corepack enable && pnpm install && pnpm dev --host 0.0.0.0"]
+    environment:
+      VITE_OBSERVER_URL: http://observer:8000
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../ui:/app
+    networks: [conclave]
+
+volumes:
+  observer_data: {}
+  senate_data: {}
+
+networks:
+  conclave:
+    driver: bridge
