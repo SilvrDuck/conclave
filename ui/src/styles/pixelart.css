@@ -1,0 +1,14 @@
+.pixel {
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: crisp-edges;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
+
+canvas.forum-canvas {
+  image-rendering: pixelated;
+  background: var(--stone);
+  border: 2px solid var(--ink);
+  display: block;
+  font-family: "JetBrains Mono", "Fira Code", monospace;
+}
