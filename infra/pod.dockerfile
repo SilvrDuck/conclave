@@ -38,5 +38,10 @@ RUN pip install ./platform
 # Pi can read primitives, personae, etc. when the host doesn't override.
 RUN mkdir -p /conclave/personae
 
+# Treat any bind-mounted git checkout as safe (workspace is host-owned).
+RUN git config --global --add safe.directory '*' \
+ && git config --global user.email 'pod@conclave.local' \
+ && git config --global user.name  'conclave-pod'
+
 WORKDIR /workspace
 ENTRYPOINT ["conclave-harness"]

@@ -42,14 +42,19 @@ async def run() -> None:
     charter_path = Path(
         os.environ.get("CHARTER_PATH", f"pods/{pod}/charter.md")
     )
-    session_dir = Path(os.environ.get("PI_SESSION_DIR", "/root/.pi/agent"))
+    session_dir = Path(os.environ.get("PI_SESSION_DIR", "/tmp/pi-sessions"))  # noqa: S108
+    session_dir.mkdir(parents=True, exist_ok=True)
+    pi_model = os.environ.get("PI_MODEL", "openai-codex/gpt-5.4")
+    pi_extra: list[str] = []
+    if mcp_cfg := os.environ.get("PI_MCP_CONFIG"):
+        pi_extra.extend(["--mcp-config", mcp_cfg])
     pod_workspace = workspace / "pods" / pod
 
     bus = InMemoryBus() if bus_url.startswith("inmemory") else NatsBus(servers=bus_url)
     await bus.connect()
     observer = httpx.AsyncClient(base_url=observer_url, timeout=10.0)
     repo = LocalGitRepo(workdir=workspace)
-    cli = PiCli()
+    cli = PiCli(model=pi_model, extra_args=tuple(pi_extra))
     charter_full = (workspace / charter_path).read_text(encoding="utf-8")
 
     writer = DualWriter(

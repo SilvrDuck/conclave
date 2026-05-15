@@ -33,6 +33,11 @@ class _FakeStdout:
         self._idx += 1
         return line
 
+    async def read(self) -> bytes:
+        out = b"".join(self._lines[self._idx :])
+        self._idx = len(self._lines)
+        return out
+
 
 class _FakeStdin:
     def __init__(self) -> None:
@@ -114,10 +119,10 @@ def _direct_message() -> DirectMessage:
 # ---------- tests ----------
 
 
-async def test_start_returns_session_with_pid_and_parsed_id(
+async def test_start_returns_session_with_pid_and_pod_name(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    proc = _FakeProc(pid=1234, stdout_lines=[_session_start("sess-xyz")])
+    proc = _FakeProc(pid=1234, stdout_lines=[])
     cap = _patch_spawn(monkeypatch, proc)
     cli = PiCli()
 
@@ -125,55 +130,61 @@ async def test_start_returns_session_with_pid_and_parsed_id(
         charter="be helpful",
         cwd=tmp_path,
         session_dir=tmp_path / "pi",
-        env={"FOO": "bar"},
+        env={"POD_NAME": "alice"},
         startup_timeout=1.0,
     )
 
-    assert sess == CliSession(session_id="sess-xyz", pid=1234)
+    assert sess.session_id == "alice"
+    assert sess.pid == 1234
     assert cap["argv"][0] == "pi"
     assert "--mode" in cap["argv"] and "rpc" in cap["argv"]
     assert "--system-prompt" in cap["argv"]
     assert cap["argv"][cap["argv"].index("--system-prompt") + 1] == "be helpful"
     assert "--session-dir" in cap["argv"]
+    # New spawns must NOT pass --session (Pi treats that as resume-or-die).
+    assert "--session" not in cap["argv"]
     assert cap["cwd"] == str(tmp_path)
-    assert cap["env"] == {"FOO": "bar"}
+    assert cap["env"] == {"POD_NAME": "alice"}
+    await cli.stop(sess, timeout=1.0)
 
 
-async def test_resume_passes_session_id_flag(
+async def test_resume_reloads_charter_from_workspace(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    proc = _FakeProc(pid=99, stdout_lines=[_session_start("sess-resumed")])
+    (tmp_path / "charter.md").write_text("be helpful (resumed)")
+    proc = _FakeProc(pid=99, stdout_lines=[])
     cap = _patch_spawn(monkeypatch, proc)
     cli = PiCli()
 
     sess = await cli.resume(
-        session=CliSession(session_id="sess-resumed", pid=0),
+        session=CliSession(session_id="alice", pid=0),
         cwd=tmp_path,
         session_dir=tmp_path,
         env={},
         startup_timeout=1.0,
     )
 
-    assert sess.session_id == "sess-resumed"
-    assert "--session" in cap["argv"]
-    assert cap["argv"][cap["argv"].index("--session") + 1] == "sess-resumed"
+    assert sess.session_id == "alice"
+    assert "--system-prompt" in cap["argv"]
+    assert cap["argv"][cap["argv"].index("--system-prompt") + 1] == "be helpful (resumed)"
+    assert "--session" not in cap["argv"]
+    await cli.stop(sess, timeout=1.0)
 
 
-async def test_start_timeout_kills_process(
+async def test_start_raises_when_pi_exits_immediately(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    proc = _FakeProc(stdout_lines=[])  # never emits session_start
+    proc = _FakeProc(stdout_lines=[b"Error: No API key for provider: anthropic\n"])
+    proc.returncode = 1
     _patch_spawn(monkeypatch, proc)
     cli = PiCli()
 
-    # The fake stdout iterator returns StopAsyncIteration immediately, so the
-    # reader raises PiStartupError (exited before session_start), not TimeoutError.
     with pytest.raises(PiStartupError):
         await cli.start(
             charter="x",
             cwd=tmp_path,
             session_dir=tmp_path,
-            env={},
+            env={"POD_NAME": "alice"},
             startup_timeout=0.05,
         )
 
@@ -181,11 +192,15 @@ async def test_start_timeout_kills_process(
 async def test_deliver_writes_event_json_line(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    proc = _FakeProc(stdout_lines=[_session_start()])
+    proc = _FakeProc(stdout_lines=[])
     _patch_spawn(monkeypatch, proc)
     cli = PiCli()
     sess = await cli.start(
-        charter="c", cwd=tmp_path, session_dir=tmp_path, env={}, startup_timeout=1.0
+        charter="c",
+        cwd=tmp_path,
+        session_dir=tmp_path,
+        env={"POD_NAME": "alice"},
+        startup_timeout=1.0,
     )
 
     event = _direct_message()
@@ -204,11 +219,15 @@ async def test_deliver_writes_event_json_line(
 async def test_is_alive_tracks_returncode(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    proc = _FakeProc(stdout_lines=[_session_start()])
+    proc = _FakeProc(stdout_lines=[])
     _patch_spawn(monkeypatch, proc)
     cli = PiCli()
     sess = await cli.start(
-        charter="c", cwd=tmp_path, session_dir=tmp_path, env={}, startup_timeout=1.0
+        charter="c",
+        cwd=tmp_path,
+        session_dir=tmp_path,
+        env={"POD_NAME": "alice"},
+        startup_timeout=1.0,
     )
     assert await cli.is_alive(sess) is True
     proc.returncode = 0
@@ -218,11 +237,15 @@ async def test_is_alive_tracks_returncode(
 async def test_stop_terminates_and_waits(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    proc = _FakeProc(stdout_lines=[_session_start()])
+    proc = _FakeProc(stdout_lines=[])
     _patch_spawn(monkeypatch, proc)
     cli = PiCli()
     sess = await cli.start(
-        charter="c", cwd=tmp_path, session_dir=tmp_path, env={}, startup_timeout=1.0
+        charter="c",
+        cwd=tmp_path,
+        session_dir=tmp_path,
+        env={"POD_NAME": "alice"},
+        startup_timeout=1.0,
     )
 
     await cli.stop(sess, timeout=1.0)
@@ -248,7 +271,11 @@ async def test_stop_kills_hanging_process(
     _patch_spawn(monkeypatch, proc)
     cli = PiCli()
     sess = await cli.start(
-        charter="c", cwd=tmp_path, session_dir=tmp_path, env={}, startup_timeout=1.0
+        charter="c",
+        cwd=tmp_path,
+        session_dir=tmp_path,
+        env={"POD_NAME": "alice"},
+        startup_timeout=1.0,
     )
 
     await cli.stop(sess, timeout=0.05)
@@ -261,7 +288,7 @@ async def test_stream_output_yields_decoded_lines(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     lines = [
-        _session_start(),
+        b'{"type":"agent_start"}\n',
         b'{"type":"message_update","delta":"hello"}\n',
         b'{"type":"agent_end"}\n',
     ]
@@ -269,15 +296,23 @@ async def test_stream_output_yields_decoded_lines(
     _patch_spawn(monkeypatch, proc)
     cli = PiCli()
     sess = await cli.start(
-        charter="c", cwd=tmp_path, session_dir=tmp_path, env={}, startup_timeout=1.0
+        charter="c",
+        cwd=tmp_path,
+        session_dir=tmp_path,
+        env={"POD_NAME": "alice"},
+        startup_timeout=1.0,
     )
+    # Let the drain task consume the fake stdout.
+    await asyncio.sleep(0)
+    await asyncio.sleep(0)
 
     out = [line async for line in cli.stream_output(sess)]
-    # session_start was consumed during startup; only the two remaining lines stream.
     assert out == [
+        '{"type":"agent_start"}',
         '{"type":"message_update","delta":"hello"}',
         '{"type":"agent_end"}',
     ]
+    await cli.stop(sess, timeout=1.0)
 
 
 async def test_pi_satisfies_cli_adapter_protocol() -> None:

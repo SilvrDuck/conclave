@@ -93,12 +93,20 @@ class LocalGitRepo:
         branch: str,
     ) -> Commit:
         async with self._lock:
-            await self._git("checkout", branch)
             target = self._workdir / path
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(content)
-            await self._git("add", path)
-            await self._git("commit", "-m", message)
+            # Skip the write entirely when content is already current — touching
+            # the file would update mtime and re-trigger any mtime watcher.
+            existing = target.read_text() if target.exists() else None
+            if existing != content:
+                await self._git("checkout", branch)
+                target.write_text(content)
+                await self._git("add", path)
+                rc, _, _ = await self._git(
+                    "diff", "--cached", "--quiet", "--", path, check=False
+                )
+                if rc != 0:
+                    await self._git("commit", "-m", message)
             _, sha, _ = await self._git("rev-parse", "HEAD")
             return Commit(sha=sha.strip())
 
