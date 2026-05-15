@@ -1,0 +1,101 @@
+[project]
+name = "conclave-platform"
+version = "0.1.0"
+description = "Consensus-driven, orchestrator-free platform for autonomous AI agents."
+readme = "README.md"
+authors = [
+    { name = "Thibault Viglino", email = "thibault@thvi.ch" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "anyio>=4.13.0",
+    "asyncpg>=0.31.0",
+    "click>=8.3.3",
+    "fastapi>=0.136.1",
+    "fastmcp>=2.10",
+    "httpx>=0.28.1",
+    "jinja2>=3.1.6",
+    "mcp>=1.0",
+    "nats-py>=2.9",
+    "opentelemetry-api>=1.41.1",
+    "opentelemetry-exporter-otlp>=1.41.1",
+    "opentelemetry-sdk>=1.41.1",
+    "pydantic>=2.13.4",
+    "pydantic-settings>=2.14.1",
+    "pyyaml>=6.0.3",
+    "questionary>=2.1.1",
+    "sqlalchemy[asyncio]>=2.0",
+    "structlog>=25.5.0",
+    "uvicorn[standard]>=0.47.0",
+]
+
+[project.scripts]
+conclave-observer = "conclave_platform.observer.main:main"
+conclave-senate = "conclave_platform.senate_ledger.main:main"
+conclave-mcp-coms = "conclave_platform.mcp.coms.main:main"
+conclave-mcp-senate = "conclave_platform.mcp.senate.main:main"
+conclave-mcp-decisions = "conclave_platform.mcp.decisions.main:main"
+conclave-mcp-state = "conclave_platform.mcp.state.main:main"
+conclave-harness = "conclave_platform.harness.main:main"
+conclave-wizard = "conclave_platform.wizard.main:main"
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "aiosqlite>=0.22.1",
+    "httpx>=0.28.1",
+    "hypothesis>=6",
+    "mypy>=2.1.0",
+    "pytest>=9.0.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=7.1.0",
+    "respx>=0.23.1",
+    "ruff>=0.15.13",
+    "types-pyyaml>=6.0.12.20260510",
+]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-ra -q --strict-markers"
+markers = [
+    "smoke: end-to-end smoke tests (slow, require docker)",
+    "integration: integration tests (medium, may require services)",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "ASYNC", "S", "RET", "SIM", "PL", "RUF"]
+ignore = [
+    "S101",   # asserts in tests
+    "PLR2004", # magic numbers
+    "PLR0913", # many args
+    "ASYNC109", # timeout param is the explicit hard-timeout contract per CLAUDE.md
+    "ASYNC240", # we don't use trio/anyio.path — sync pathlib is fine in our async code
+    "B008",   # FastAPI Depends() in default — standard pattern
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S", "PLR"]
+"scripts/**" = ["S603", "S607"]  # docker/git/pi subprocess calls on host
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = ["nats.*", "fastmcp.*", "questionary.*"]
+ignore_missing_imports = true

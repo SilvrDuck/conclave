@@ -1,0 +1,195 @@
+name: conclave
+
+services:
+  bus:
+    image: nats:2.10-alpine
+    container_name: conclave-bus
+    command: ["-js"]
+    ports:
+      - "4222:4222"
+    networks: [conclave]
+    healthcheck:
+      test: ["CMD", "nc", "-z", "127.0.0.1", "4222"]
+      interval: 5s
+      timeout: 2s
+      retries: 5
+
+  observer:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-observer
+    command: ["conclave-observer"]
+    environment:
+      OBSERVER_DSN: sqlite+aiosqlite:////data/observer.db
+      OBSERVER_HOST: 0.0.0.0
+      OBSERVER_PORT: "8000"
+      BUS_URL: nats://bus:4222
+    ports:
+      - "8000:8000"
+    volumes:
+      - observer_data:/data
+    depends_on:
+      bus:
+        condition: service_healthy
+    networks: [conclave]
+
+  senate-ledger:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-senate-ledger
+    command: ["conclave-senate"]
+    environment:
+      SENATE_DSN: sqlite+aiosqlite:////data/senate.db
+      SENATE_HOST: 0.0.0.0
+      SENATE_PORT: "8001"
+      OBSERVER_URL: http://observer:8000
+      DOCS_KIND: ${DOCS_KIND:-inmemory}
+      REPO_FULL_NAME: ${REPO_FULL_NAME:-}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    ports:
+      - "8001:8001"
+    volumes:
+      - senate_data:/data
+    depends_on:
+      - observer
+    networks: [conclave]
+
+  mcp-coms:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-mcp-coms
+    command: ["conclave-mcp-coms"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8002"
+      BUS_URL: nats://bus:4222
+      OBSERVER_URL: http://observer:8000
+    ports:
+      - "8002:8002"
+    depends_on:
+      - bus
+      - observer
+    networks: [conclave]
+
+  mcp-senate:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-mcp-senate
+    command: ["conclave-mcp-senate"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8003"
+      SENATE_URL: http://senate-ledger:8001
+    ports:
+      - "8003:8003"
+    depends_on:
+      - senate-ledger
+    networks: [conclave]
+
+  mcp-decisions:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-mcp-decisions
+    command: ["conclave-mcp-decisions"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8004"
+      DOCS_KIND: senate_proxy
+      SENATE_URL: http://senate-ledger:8001
+    ports:
+      - "8004:8004"
+    depends_on:
+      - senate-ledger
+    networks: [conclave]
+
+  mcp-state:
+    build:
+      context: ..
+      dockerfile: infra/observer.dockerfile
+    container_name: conclave-mcp-state
+    command: ["conclave-mcp-state"]
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8005"
+      OBSERVER_URL: http://observer:8000
+    ports:
+      - "8005:8005"
+    depends_on:
+      - observer
+    networks: [conclave]
+
+  founder:
+    image: conclave-pod:0.1
+    container_name: conclave-founder
+    # The harness drives Pi via --mode rpc. Pi uses the ChatGPT Plus / Codex
+    # OAuth credentials in ~/.pi/agent/auth.json mounted ro from the host.
+    environment:
+      POD_NAME: founder
+      BUS_URL: nats://bus:4222
+      OBSERVER_URL: http://observer:8000
+      WORKSPACE_ROOT: /workspace
+      BRANCH: main
+      CHARTER_PATH: pods/founder/charter.md
+      PI_SESSION_DIR: /tmp/pi-sessions
+      PI_MODEL: ${PI_MODEL:-openai-codex/gpt-5.4}
+      PI_MCP_CONFIG: /conclave/mcp.json
+      HOME: /root
+    volumes:
+      # The fresh demo monorepo bind-mounted as the pod's writable workspace.
+      - ${PROJECT_ROOT:-/tmp/conclave-demo}:/workspace
+      # ChatGPT Plus / Codex token (writable so Pi can refresh it).
+      - ${HOME}/.pi/agent/auth.json:/root/.pi/agent/auth.json
+      # /conclave/ is the platform-owned ro mount: primitives, personae, etc.
+      - ${PROJECT_ROOT:-/tmp/conclave-demo}/personae:/conclave/personae:ro
+      - ${PROJECT_ROOT:-/tmp/conclave-demo}/primitives.md:/conclave/primitives.md:ro
+      - ${PROJECT_ROOT:-/tmp/conclave-demo}/iusiurandum.md:/conclave/iusiurandum.md:ro
+      - ${PROJECT_ROOT:-/tmp/conclave-demo}/voting-strategies.md:/conclave/voting-strategies.md:ro
+      - ./pod-mcp-config.json:/conclave/mcp.json:ro
+    depends_on:
+      bus:
+        condition: service_healthy
+      observer:
+        condition: service_started
+      senate-ledger:
+        condition: service_started
+      mcp-coms:
+        condition: service_started
+      mcp-senate:
+        condition: service_started
+      mcp-decisions:
+        condition: service_started
+      mcp-state:
+        condition: service_started
+    networks: [conclave]
+
+  forum-ui:
+    # Use the glibc image (not alpine) so native bindings built on the host
+    # don't crash. Keep node_modules inside an anonymous volume so the host
+    # tree never overlays the container's install.
+    image: node:24-bookworm-slim
+    container_name: conclave-forum-ui
+    working_dir: /app
+    command: ["sh", "-c", "corepack enable && pnpm install && pnpm dev --host 0.0.0.0 --port 5173"]
+    environment:
+      VITE_OBSERVER_URL: http://observer:8000
+      VITE_SENATE_URL: http://senate-ledger:8001
+    ports:
+      - "5173:5173"
+    volumes:
+      - ../ui:/app
+      - forum_node_modules:/app/node_modules
+    networks: [conclave]
+
+volumes:
+  observer_data: {}
+  senate_data: {}
+  forum_node_modules: {}
+
+networks:
+  conclave:
+    driver: bridge

@@ -1,0 +1,20 @@
+{
+  "mcpServers": {
+    "coms": {
+      "type": "http",
+      "url": "http://mcp-coms:8002/mcp"
+    },
+    "senate": {
+      "type": "http",
+      "url": "http://mcp-senate:8003/mcp"
+    },
+    "decisions": {
+      "type": "http",
+      "url": "http://mcp-decisions:8004/mcp"
+    },
+    "state": {
+      "type": "http",
+      "url": "http://mcp-state:8005/mcp"
+    }
+  }
+}
