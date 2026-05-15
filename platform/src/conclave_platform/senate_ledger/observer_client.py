@@ -29,3 +29,11 @@ class ObserverClient:
         r = await self._client.get("/state/callers", params={"method": method, "path": path})
         r.raise_for_status()
         return [PodName(p) for p in r.json().get("callers", [])]
+
+    async def upsert_member(
+        self, *, name: PodName, charter_path: str, status: str
+    ) -> None:
+        await self._client.post(
+            "/ingest/member",
+            json={"name": name, "charter_path": charter_path, "status": status},
+        )

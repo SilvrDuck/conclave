@@ -202,7 +202,11 @@ async def _reevaluate(
     adr_id: str | None = None
     if result.outcome == ProposalOutcome.approved:
         adr_id = await _approve_side_effects(
-            session, docs=docs, proposal=proposal, reason=result.reason
+            session,
+            docs=docs,
+            observer=observer,
+            proposal=proposal,
+            reason=result.reason,
         )
     elif result.outcome == ProposalOutcome.rejected:
         adr_id = await docs.write_adr(
@@ -226,6 +230,7 @@ async def _approve_side_effects(
     session: AsyncSession,
     *,
     docs: DocsAdapter,
+    observer: ObserverClient,
     proposal: Proposal,
     reason: str,
 ) -> str:
@@ -244,14 +249,32 @@ async def _approve_side_effects(
         proposal_id=proposal.id,
     )
     if proposal.kind == ProposalKind.member:
-        # The pod_name is the slug derived from payload — caller passes it explicitly.
         target = proposal.payload.get("pod_name")
         if target:
-            await repo.add_member(session, PodName(str(target)))
+            target_pod = PodName(str(target))
+            await repo.add_member(session, target_pod)
+            charter = str(
+                proposal.payload.get("charter_path") or f"pods/{target_pod}/charter.md"
+            )
+            try:
+                await observer.upsert_member(
+                    name=target_pod, charter_path=charter, status="admitted"
+                )
+            except Exception as exc:
+                log.warning("senate.observer_mirror_failed", pod=target_pod, exc=str(exc))
     elif proposal.kind == ProposalKind.exile:
         target = proposal.payload.get("pod_name")
         if target:
-            await repo.exile_member(session, PodName(str(target)))
+            target_pod = PodName(str(target))
+            await repo.exile_member(session, target_pod)
+            try:
+                await observer.upsert_member(
+                    name=target_pod,
+                    charter_path=f"pods/{target_pod}/charter.md",
+                    status="exiled",
+                )
+            except Exception as exc:
+                log.warning("senate.observer_mirror_failed", pod=target_pod, exc=str(exc))
     return adr_id
 
 

@@ -7,7 +7,7 @@ import os
 import structlog
 import uvicorn
 
-from ..adapters.docs import GitHubIssuesDocs, InMemoryDocs
+from ..adapters.docs import GitHubIssuesDocs, InMemoryDocs, SqliteDocs
 from .app import create_app
 from .observer_client import ObserverClient
 
@@ -27,6 +27,9 @@ def main() -> None:
         token = os.environ["GITHUB_TOKEN"]
         owner, _, repo_ = os.environ["REPO_FULL_NAME"].partition("/")
         docs = GitHubIssuesDocs(owner=owner, repo=repo_, token=token)
+    elif docs_kind == "sqlite":
+        dsn = os.environ.get("DOCS_DSN", "sqlite+aiosqlite:////data/docs.db")
+        docs = SqliteDocs(dsn=dsn)
     else:
         docs = InMemoryDocs()
     log.info("senate.start", dsn=dsn, observer=observer_url, docs=docs_kind, port=port)

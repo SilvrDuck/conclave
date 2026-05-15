@@ -18,7 +18,7 @@ from ..core import (
     VotingStrategy,
     utc_now,
 )
-from ..core.ids import ProposalId
+from ..core.ids import AdrId, ProposalId
 from .orm import BallotRow, MemberRow, ProposalRow
 
 
@@ -180,6 +180,7 @@ def _to_proposal(row: ProposalRow) -> Proposal:
         deadline=deadline,
         outcome=ProposalOutcome(row.outcome) if row.outcome else None,
         decided_at=_utc(row.decided_at),
+        adr_id=AdrId(row.adr_id) if row.adr_id else None,
     )
 
 

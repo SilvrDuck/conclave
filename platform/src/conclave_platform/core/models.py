@@ -153,6 +153,7 @@ class Proposal(BaseModel):
     deadline: datetime
     outcome: ProposalOutcome | None = None
     decided_at: datetime | None = None
+    adr_id: AdrId | None = None
 
 
 class Ballot(BaseModel):

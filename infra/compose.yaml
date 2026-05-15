@@ -99,11 +99,12 @@ services:
     environment:
       HOST: 0.0.0.0
       PORT: "8004"
-      DOCS_KIND: ${DOCS_KIND:-inmemory}
-      REPO_FULL_NAME: ${REPO_FULL_NAME:-}
-      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      DOCS_KIND: senate_proxy
+      SENATE_URL: http://senate-ledger:8001
     ports:
       - "8004:8004"
+    depends_on:
+      - senate-ledger
     networks: [conclave]
 
   mcp-state:
@@ -123,21 +124,27 @@ services:
     networks: [conclave]
 
   forum-ui:
-    image: node:24-alpine
+    # Use the glibc image (not alpine) so native bindings built on the host
+    # don't crash. Keep node_modules inside an anonymous volume so the host
+    # tree never overlays the container's install.
+    image: node:24-bookworm-slim
     container_name: conclave-forum-ui
     working_dir: /app
-    command: ["sh", "-c", "corepack enable && pnpm install && pnpm dev --host 0.0.0.0"]
+    command: ["sh", "-c", "corepack enable && pnpm install && pnpm dev --host 0.0.0.0 --port 5173"]
     environment:
       VITE_OBSERVER_URL: http://observer:8000
+      VITE_SENATE_URL: http://senate-ledger:8001
     ports:
       - "5173:5173"
     volumes:
       - ../ui:/app
+      - forum_node_modules:/app/node_modules
     networks: [conclave]
 
 volumes:
   observer_data: {}
   senate_data: {}
+  forum_node_modules: {}
 
 networks:
   conclave:
