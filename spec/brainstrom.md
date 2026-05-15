@@ -10,11 +10,14 @@
 
 Conclave is a consensus-driven, orchestrator-free platform for building microservice projects with autonomous AI agents. A user states a goal; a founder agent spawns; the founder proposes peers; the peers vote; together they design, build, and ship a working multi-service system. No supervisor, no router, no central coordinator decides anything — every decision affecting more than one agent is the outcome of a vote or a meeting.
 
+**One agent, one service.** Each agent is the sole owner of exactly one microservice — its developer, its maintainer, its on-call, the steward of its contract. There is no separation between "the dev agent" and "the ops agent" for a given service: the pod that wrote it is also the pod that fixes it, evolves it, and speaks for it in the senate. Multi-service work happens through inter-pod coordination (chatrooms, councils, contract votes), not through agents that span services.
+
 The platform is dumb infrastructure that *records* what agents do and gives them the primitives to coordinate. The agents are the only intelligence.
 
 ### Core principles
 
 - **Symmetry** — bootstrap is a vote, completion is a vote, contract changes are meetings producing ADRs, member removal is a vote. No special code paths anywhere. Founder = first member. User = async peer.
+- **One agent, one service** — a pod and the microservice in its `workspace/` are inseparable. The agent owns that service end-to-end (design, code, contract, ops, retirement). No service has two owning agents; no agent owns two services. To add a service, propose a new member.
 - **Observed truth over declared truth** — the platform observes reality (bus traffic, inter-pod calls, container liveness) and asks agents to annotate it. Nothing critical depends on hand-authored manifests that can drift from running code.
 - **MCP as the agent-platform contract** — every agent-platform interaction is an MCP tool call. No custom shell primitives.
 - **Pluggability at every external boundary** — transport, repo host, CI/CD, doc backend, CLI runtime, observability, notification, runtime/IaC. Each slot ships ≥2 candidates in alpha to prove the abstraction is real.
@@ -148,7 +151,7 @@ What's source code, what's running, what's the project itself? Crucially separab
 
 ## 4. Anatomy of a pod
 
-Every agent is identical in structure. Two processes inside the container, three things mounted, four MCPs reached over the network.
+A pod is **one agent + one microservice**, packaged together. The agent inside is the service's only owner — the dev who writes it, the maintainer who keeps it healthy, the voice who speaks for it in the senate. Every pod is identical in structure: two processes inside the container, three things mounted, four MCPs reached over the network.
 
 ```
                        ╭────────── pod container ──────────╮
@@ -168,6 +171,7 @@ Every agent is identical in structure. Two processes inside the container, three
                        │   │   • spawn/idle CLI         │   │
                        │   │   • inbox poll (bus topic) │   │
                        │   │   • dual-write annotations │   │
+                       │   │   • dual-write agenda      │   │
                        │   │   • MCP server wiring      │   │
                        │   │   • mount enforcement      │   │
                        │   └────────────┬───────────────┘   │
@@ -200,6 +204,7 @@ Every agent is identical in structure. Two processes inside the container, three
 pods/alice/
 ├── charter.md            # the agent's system prompt (free-form, peer-authored)
 ├── endpoints.md          # endpoint annotations (dual-written by harness)
+├── agenda.md             # what alice is doing right now + her plan (see §4.1)
 ├── README.md             # what this pod does, peer-readable
 ├── workspace/            # service code: source of truth for the running service
 ├── skills/               # pod-local skills (peer-readable, monorepo default)
@@ -210,10 +215,17 @@ pods/alice/
 
 ```
 shared/
-├── skills/               # cross-pod skills (relocated here by senate vote)
-├── libs/                 # cross-pod code (same logic)
+├── skills/               # cross-pod skills (any pod can place; see below)
+├── libs/                 # cross-pod code (same rule)
 └── infra-refs/           # cross-pod constants/refs (rare)
 ```
+
+**How things land in `shared/` — by initiative, not by vote.** There is no proposal, no ballot, no senate gate. Two flows, both peer-to-peer over `coms`:
+
+- **Push** — any pod that notices peers need something it has can move that artifact into `shared/` on its own initiative and announce it (e.g. `direct_message` to the likely consumers, or a one-line post in a relevant chatroom). The committing pod is also the maintainer until someone else volunteers.
+- **Pull** — a pod that needs something a peer has can ask that peer to promote it. The owning pod decides; if they refuse, the requester is free to re-implement in their own `pods/self/` and later push it themselves.
+
+`shared/` is rw to every pod precisely because promotion is cheap, reversible, and not worth a senate cycle. The senate is for things that change the *contract surface* between services, not for filesystem placement. Conflicts in `shared/` are handled the way any monorepo handles them — by talking, not by voting.
 
 **What's in `/conclave/`** (read-only platform reference, mounted from Layer 3):
 
@@ -223,6 +235,33 @@ shared/
 ├── personae/             # Cicero.md, Cato.md, … (experimental mode)
 └── voting-strategies.md  # what each strategy does, when to use
 ```
+
+### 4.1 The agenda — each agent's public kanban
+
+Peers need to know what an agent is up to without having to ask. An agent that's mid-refactor on its own service doesn't want to be interrupted; a peer that's about to call `GET /users/{id}` wants to know if alice is in the middle of breaking it; a downstream consumer wants to be pinged the moment a long-running task lands. The agenda solves all three.
+
+`pods/<name>/agenda.md` is a free-form markdown file owned by the pod's agent. Convention (not enforcement) is three sections — `## doing`, `## next`, `## blocked-on` — each a short bulleted list of items with a stable id (slug + monotonic counter).
+
+```
+## doing
+- [alice-42] pagination on GET /users/{id}  · since 14:02  · eta ~30min
+
+## next
+- [alice-43] migrate session store to redis
+
+## blocked-on
+- [alice-41] waiting on bob to finish auth token rotation
+```
+
+Agents update the agenda whenever the answer to "what are you doing right now" changes. The harness dual-writes it just like `endpoints.md`: git commit (durable) + observer ingest (fast read).
+
+**Peers consume the agenda three ways:**
+
+- **Pull** — `state.agenda(pod_name) → {doing, next, blocked_on}` returns the latest projected view. A peer about to depend on alice can check first.
+- **Subscribe** — `coms.subscribe_to_item(pod_name, item_id)` registers interest; the subscriber's inbox receives an `item_completed` event when that line moves out of `doing`. No polling.
+- **Request** — if a peer wants something that isn't on alice's agenda, they `direct_message` alice asking her to add it. Alice decides whether and where to slot it (`next`, refuse with reason, or counter-propose). Same as how shared/ promotion works (see §4): peer-to-peer over coms, no senate.
+
+**Open question** (also in §17): whether the agenda lives only as `agenda.md` + observer projection, or also surfaces as native artifacts in the repo host — GitHub Projects / GitLab Boards columns mirrored by the doc adapter. The latter gives the user a familiar UI for free and lets non-Conclave humans participate; the former keeps the platform self-contained and adapter-agnostic. Lean is to ship file + observer at alpha and add the projects-board mirror as a slot-5-coupled bonus when the doc backend supports it.
 
 ---
 
@@ -256,7 +295,8 @@ open_chatroom(participants, topic)        → chatroom_id
 send(chatroom_id, message)                → ack
 recv()                                    → [events]
 direct_message(peer, message)             → ack
-convene_council(participants, agenda)     → council_id
+convene_council(participants, topic)      → council_id
+subscribe_to_item(pod_name, item_id)      → subscription_id
 close(chatroom_id | council_id, summary?)
 ```
 
@@ -297,7 +337,8 @@ callers_of(endpoint)               → [pod_names]
 calls_to(pod_name)                 → [{caller, endpoint, rate}]
 chatrooms()                        → [{id, participants, topic, last_active}]
 open_proposals()                   → [proposals]
-search(query, kind?)               → [hits]   # skill | lib | endpoint | adr
+agenda(pod_name)                   → {doing, next, blocked_on, updated_at}
+search(query, kind?)               → [hits]   # skill | lib | endpoint | adr | agenda
 platform()                         → conclave_config_excerpt
 ```
 
@@ -311,6 +352,7 @@ Not a callable MCP — a subscription delivered to the agent's recv loop by the 
 message_received       │  vote_open             │  council_invited
 goal_updated           │  annotation_requested  │  member_admitted
 member_exiled          │  contract_change_proposed
+item_completed         │  agenda_updated
 ```
 
 ### What's intentionally absent
@@ -400,12 +442,13 @@ member_exiled          │  contract_change_proposed
 After a fresh deploy (or a stack swap), the observer's Postgres is empty. It bootstraps in this order:
 
 ```
-1. Read conclave.config.yaml      ──►  know which backends are live
+1. Read conclave.config.yaml    ──►  know which backends are live
 2. Read latest ADRs in doc      ──►  reconstruct member roster, last decisions
    backend
 3. Read pods/*/charter.md       ──►  member metadata
 4. Read pods/*/endpoints.md     ──►  endpoint annotations
-5. Begin subscribing to bus,    ──►  live state catches up as traffic flows
+5. Read pods/*/agenda.md        ──►  what each pod was doing pre-restart
+6. Begin subscribing to bus,    ──►  live state catches up as traffic flows
    OTel, container runtime
 ```
 
@@ -513,7 +556,7 @@ Bob ships code that alters his API
    alice wants to discuss:
       coms.convene_council(
         participants=[alice, bob, carol],
-        agenda="paging shape")
+        topic="paging shape")
                 │
                 ▼
    meeting happens · council closes
@@ -665,6 +708,7 @@ project-repo/
 │   ├── alice/
 │   │   ├── charter.md             # system prompt + role + skill list
 │   │   ├── endpoints.md           # observed endpoints + agent's annotations
+│   │   ├── agenda.md              # public kanban: doing / next / blocked-on
 │   │   ├── README.md              # peer-readable description
 │   │   ├── workspace/             # service code (the actual app)
 │   │   ├── skills/                # pod-local skills (peer-readable)
@@ -1086,6 +1130,19 @@ These don't block design-doc completion but need answers before implementation.
 │    • URL shortener with analytics (3-4 pods)                    │
 │    • Conclave-rebuild itself (dogfooding, but circular)         │
 │  Recommendation: defer until skeleton works.                    │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Agenda backing (see §4.1)                                      │
+│  ─────────────────────────                                      │
+│  Three plausible shapes:                                        │
+│    A) agenda.md + observer projection only (self-contained)     │
+│    B) A + mirror to GitHub Projects / GitLab Boards via the     │
+│       doc adapter (free UI, humans can participate)             │
+│    C) Skip the file, host the kanban *inside* the observer      │
+│       (loses portability across stack swaps)                    │
+│  Recommendation: A at alpha, B as a slot-5-coupled bonus.       │
+│  Reject C — violates "stateful project, stateless platform".    │
 └─────────────────────────────────────────────────────────────────┘
 
 ┌─────────────────────────────────────────────────────────────────┐
