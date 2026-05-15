@@ -78,6 +78,7 @@ ignore = [
     "PLR2004", # magic numbers
     "PLR0913", # many args
     "ASYNC109", # timeout param is the explicit hard-timeout contract per CLAUDE.md
+    "B008",   # FastAPI Depends() in default — standard pattern
 ]
 
 [tool.ruff.lint.per-file-ignores]
