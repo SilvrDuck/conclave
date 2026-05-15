@@ -84,6 +84,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["S", "PLR"]
+"scripts/**" = ["S603", "S607"]  # docker/git/pi subprocess calls on host
 
 [tool.mypy]
 python_version = "3.12"

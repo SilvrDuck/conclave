@@ -12,11 +12,12 @@ from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from ..adapters import BusAdapter
-from ..core import AgendaItem, EventEnvelope, MemberStatus, endpoint_key
-from ..core.events import SYSTEM_OBSERVER_TOPIC, AnnotationRequested
+from ..core import AgendaItem, EventEnvelope, GoalUpdated, MemberStatus, endpoint_key
+from ..core.events import SYSTEM_OBSERVER_TOPIC, AnnotationRequested, pod_inbox_topic
 from ..core.ids import EndpointKey, PodName
 from . import repository as repo
 from .db import make_engine, make_session_factory, session_scope
@@ -36,6 +37,11 @@ from .schema import (
     IngestMemberIn,
     MembersOut,
 )
+
+
+class MandateIn(BaseModel):
+    pod: PodName = PodName("founder")
+    goal: str
 
 
 @dataclass
@@ -194,6 +200,20 @@ def create_app(*, dsn: str, bus: BusAdapter | None = None) -> FastAPI:
             if not any(m.name == pod and m.status != MemberStatus.exiled for m in members):
                 raise HTTPException(status_code=404, detail=f"no such pod: {pod}")
         return AgendaOut(snapshot=snap)
+
+    @app.post("/control/mandate")
+    async def control_mandate(body: MandateIn) -> dict[str, str]:
+        """User-facing mandate publisher — wakes the founder pod (or any pod)
+        with a goal_updated event. Used by the Forum UI's mandate input."""
+        if deps.bus is None:
+            raise HTTPException(status_code=503, detail="bus not wired")
+        envelope = EventEnvelope(
+            event=GoalUpdated(target_pod=body.pod, goal=body.goal),
+        )
+        await deps.bus.publish(
+            pod_inbox_topic(body.pod), envelope.model_dump_json().encode("utf-8")
+        )
+        return {"pod": body.pod, "ok": "published"}
 
     app.state.deps = deps
     return app

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
-import { getAgenda, listMembers } from "../api/observer";
+import { getAgenda, listMembers, sendMandate } from "../api/observer";
 import type { AgendaSnapshot, Member } from "../api/observer";
 import { drawDomus, spritePosition } from "../components/Sprite";
 
@@ -87,6 +87,7 @@ export function Forum() {
         something (agenda item in <code>doing</code>). Updated every{" "}
         {REFRESH_MS / 1000}s.
       </p>
+      <MandateInput />
       {error ? (
         <p style={{ color: "#a23" }}>
           Could not reach observer: {(error as Error).message}
@@ -102,5 +103,73 @@ export function Forum() {
         Members: {members ? members.length : "..."}
       </p>
     </section>
+  );
+}
+
+function MandateInput() {
+  const [goal, setGoal] = useState("");
+  const [pod, setPod] = useState("founder");
+  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    if (!goal.trim()) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      await sendMandate(pod, goal);
+      setStatus(`Published to pod/${pod}/inbox.`);
+      setGoal("");
+    } catch (err) {
+      setStatus(`Failed: ${(err as Error).message}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form
+      onSubmit={onSubmit}
+      style={{
+        display: "flex",
+        gap: "0.5rem",
+        margin: "0.75rem 0 1rem",
+        padding: "0.75rem",
+        background: "var(--marble)",
+        border: "1px solid var(--stone)",
+        borderRadius: "4px",
+      }}
+    >
+      <input
+        type="text"
+        value={pod}
+        onChange={(e) => setPod(e.target.value)}
+        style={{ width: "10ch", fontFamily: '"JetBrains Mono", monospace' }}
+        aria-label="Target pod"
+      />
+      <input
+        type="text"
+        placeholder="Mandate (e.g., 'propose a peer named alice to own the auth service')"
+        value={goal}
+        onChange={(e) => setGoal(e.target.value)}
+        style={{ flex: 1 }}
+        aria-label="Mandate"
+      />
+      <button type="submit" disabled={busy || !goal.trim()}>
+        {busy ? "Sending…" : "Send mandate"}
+      </button>
+      {status ? (
+        <span
+          style={{
+            alignSelf: "center",
+            color: status.startsWith("Failed") ? "#a23" : "var(--stone)",
+            fontSize: "0.85em",
+          }}
+        >
+          {status}
+        </span>
+      ) : null}
+    </form>
   );
 }

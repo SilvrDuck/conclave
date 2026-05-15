@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { getJson } from "./client";
+import { getJson, postJson } from "./client";
 
 const memberStatus = z.enum(["proposed", "admitted", "exiled"]);
 const agendaSection = z.enum(["doing", "next", "blocked_on"]);
@@ -90,4 +90,11 @@ export async function listChatrooms(): Promise<Chatroom[]> {
 export async function getAgenda(pod: string): Promise<AgendaSnapshot> {
   const data = await getJson(`/state/agenda/${encodeURIComponent(pod)}`);
   return AgendaOut.parse(data).snapshot;
+}
+
+const MandateAck = z.object({ pod: z.string(), ok: z.string() });
+
+export async function sendMandate(pod: string, goal: string): Promise<void> {
+  const data = await postJson("/observer/control/mandate", { pod, goal });
+  MandateAck.parse(data);
 }

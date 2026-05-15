@@ -41,7 +41,7 @@ async def get(client: httpx.AsyncClient, url: str, **params: object) -> dict[str
     return data
 
 
-async def main() -> int:
+async def main() -> int:  # noqa: PLR0915
     async with httpx.AsyncClient() as c:
         print("== 1. Health check ==")
         for u in (f"{OBSERVER}/healthz", f"{SENATE}/healthz"):
