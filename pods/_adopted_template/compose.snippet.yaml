@@ -1,0 +1,38 @@
+# Template snippet — copy into infra/compose.yaml and rename the keys.
+#
+# Replace `${ROLE}` and `${IMAGE}` *textually*. Docker Compose only
+# substitutes env vars inside service-key values; it does NOT substitute
+# service names or `container_name`. So `${ROLE}:` and
+# `container_name: pod-${ROLE}` need a real edit, not a runtime env.
+#
+# Pick a distinct host port if exposing.
+
+x-adopted-pod-template: &adopted-pod-template
+  profiles: ["pod-${ROLE}"]
+  restart: unless-stopped
+  networks: [conclave]
+
+services:
+  ${ROLE}:
+    <<: *adopted-pod-template
+    image: ${IMAGE}                # e.g. postgres:16 / meilisearch:1.10
+    container_name: pod-${ROLE}
+    # ports / env / volumes per the upstream image's docs
+
+  ${ROLE}-sidecar:
+    <<: *adopted-pod-template
+    build:
+      context: ../pods/${ROLE}
+      dockerfile: sidecar/Dockerfile
+    environment:
+      POD_ID: ${ROLE}
+      DISPLAY_ROLE: ${ROLE}
+      MAIN_CONTAINER: pod-${ROLE}
+      MAIN_IMAGE: ${IMAGE}
+      MCP_PODS_URL: http://mcp-pods:8000/mcp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      ENABLE_AGENT: "false"
+    depends_on:
+      - ${ROLE}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
