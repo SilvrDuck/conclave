@@ -79,11 +79,20 @@ class PodsService:
     async def rename_self(self, *, pod_id: str, new_display_role: str) -> None:
         if not new_display_role.strip():
             raise ValueError("new_display_role must be non-empty")
+        # CTE pattern: capture the *pre-update* role in `before`, then update
+        # and return it. Without the CTE, a sub-SELECT in RETURNING sees the
+        # post-update row (RETURNING runs after the UPDATE has applied).
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
-                """UPDATE pods.pods SET display_role = $2
-                     WHERE pod_id = $1
-                     RETURNING (SELECT display_role FROM pods.pods WHERE pod_id = $1) AS old""",
+                """WITH before AS (
+                       SELECT display_role AS old_role FROM pods.pods
+                        WHERE pod_id = $1 FOR UPDATE
+                   ), upd AS (
+                       UPDATE pods.pods SET display_role = $2
+                        WHERE pod_id = $1
+                        RETURNING pod_id
+                   )
+                   SELECT before.old_role FROM before, upd""",
                 pod_id,
                 new_display_role,
             )
@@ -93,11 +102,13 @@ class PodsService:
             PodRenamed(
                 pod_id=pod_id,
                 new_display_role=new_display_role,
-                old_display_role=row["old"],
+                old_display_role=row["old_role"],
             ),
             PODS_CONTEXT,
         )
-        log.info("PodRenamed %s -> %s", pod_id, new_display_role)
+        log.info(
+            "PodRenamed %s: %r -> %r", pod_id, row["old_role"], new_display_role
+        )
 
     # ─── reactors (consume events from senate, observer) ────────────────
 
