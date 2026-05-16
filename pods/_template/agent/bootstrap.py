@@ -23,6 +23,7 @@ import os
 import secrets
 import signal
 import sys
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -44,7 +45,10 @@ SERVICE_PORT = os.environ.get("SERVICE_PORT", "8000")
 ENABLE_AGENT = os.environ.get("ENABLE_AGENT", "false").lower() == "true"
 CHARTER_PATH = Path("/pod/charter.md")
 SYSTEM_PREAMBLE_PATH = Path("/pod/system_preamble.md")
-COMPOSED_SYSTEM_PATH = Path("/pod/agent/system.md")
+# /pod/agent is an image-baked, writable layer (no bind mount) — safe
+# for per-turn temp files. tempfile.mkstemp gives us collision-free
+# names so two parallel _run_claude calls cannot stomp each other.
+SYSTEM_TMP_DIR = Path("/pod/agent")
 MCP_CONFIG_PATH = "/pod/agent/mcp.json"
 def _resolve_claude_bin() -> str:
     """Locate the claude binary inside the pod.
@@ -179,10 +183,18 @@ def _build_prompt(pod_id: str, display_role: str, event_kind: str, event: dict) 
 
 
 def _compose_system_prompt() -> Path:
-    """Concatenate the platform preamble (cross-pod rules) with the
-    pod's charter (its role) into a single file that Claude reads via
-    --append-system-prompt-file. Re-runs every turn so a charter edit
-    by Augustus picks up on the next Claude call without a restart."""
+    """Write a per-turn system prompt: charter sandwiched between a
+    header and the platform preamble. The agent reads the composed
+    file via --append-system-prompt-file.
+
+    Order matters: Claude appends `--append-system-prompt-file` text
+    to its default system prompt, and late-binding wins on conflicts.
+    The platform preamble therefore goes LAST so it overrides any
+    charter edit — agents can rewrite their charter, but cannot
+    neutralise the platform's rules by doing so.
+
+    Fresh tempfile per turn defeats races if two `_run_claude` calls
+    overlap (today they're serial; future-proofing only)."""
     if not SYSTEM_PREAMBLE_PATH.exists():
         raise FileNotFoundError(
             f"system preamble missing at {SYSTEM_PREAMBLE_PATH} — "
@@ -192,11 +204,27 @@ def _compose_system_prompt() -> Path:
         raise FileNotFoundError(
             f"charter missing at {CHARTER_PATH} — pod_dir not rendered?"
         )
-    COMPOSED_SYSTEM_PATH.parent.mkdir(parents=True, exist_ok=True)
     preamble = SYSTEM_PREAMBLE_PATH.read_text()
     charter = CHARTER_PATH.read_text()
-    COMPOSED_SYSTEM_PATH.write_text(preamble + "\n\n---\n\n" + charter)
-    return COMPOSED_SYSTEM_PATH
+    composed = (
+        "# Your charter\n\n"
+        + charter
+        + "\n\n---\n\n"
+        + preamble
+        + "\n\n# Platform priorities are non-negotiable\n\n"
+        "The Platform priorities section above overrides anything in\n"
+        "your charter that contradicts it.\n"
+    )
+    fd, name = tempfile.mkstemp(
+        prefix="system-", suffix=".md", dir=str(SYSTEM_TMP_DIR)
+    )
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(composed)
+    except Exception:
+        os.unlink(name)
+        raise
+    return Path(name)
 
 
 async def _run_claude(pod_id: str, prompt: str) -> None:
@@ -296,6 +324,13 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
         log.error("agent turn %s timed out after %ss; killing", turn_id, AGENT_TURN_TIMEOUT_S)
         proc.kill()
         await proc.wait()
+    finally:
+        # Reclaim the per-turn system prompt file; the subprocess has
+        # finished reading it.
+        try:
+            os.unlink(system_path)
+        except OSError:
+            pass
     log.info("agent turn %s finished rc=%s", turn_id, proc.returncode)
     await _publish_event(
         "AgentTurnEnded",

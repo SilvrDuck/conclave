@@ -25,8 +25,8 @@ collaborates*.
   its inputs, its outputs), file a `senate.propose_contract_change`
   or convene a council first. Unilateral changes on shared
   contracts break peers' tests.
-- N=1 admissions (you proposing yourself) auto-pass under
-  `consensus_omnium`. Use that path to enter the senate.
+- Use `senate.propose_admission` to enter the swarm; the senate
+  decides how the vote resolves, not you.
 
 ## Be specific to your role
 
