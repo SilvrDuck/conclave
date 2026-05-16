@@ -1,10 +1,13 @@
 # 08 — v2 Acceptance
 
 **Status**: contract for "done" on v2. When the criteria below pass on
-a clean machine, v2 is shipped.
+a clean machine for the **current validation scenario**, the
+acceptance pass is complete. v2 is shipped only when the realize →
+analyze → nuke loop in §14 closes with zero new platform-gap tasks.
 
-> v2's deliverable is the *platform*, not the music app. The
-> Spotify-clone is exercise weight — see [00-vision](00-vision.md).
+> v2's deliverable is the *platform*, not whichever app the swarm
+> builds this round. The validation scenarios (Spotify-clone, design
+> Uber, …) are exercise weight — see [00-vision](00-vision.md).
 > Acceptance failures are platform failures, never "the agents could
 > have built a better feature."
 
@@ -12,14 +15,16 @@ a clean machine, v2 is shipped.
 
 ## The shape of acceptance
 
-Three layers, in order. All three must pass.
+Four layers, in order. All four must pass for v2 to ship.
 
-1. **Golden run.** One unscripted execution of the Spotify-clone
-   mandate that reaches the end-state below.
+1. **Golden run.** One unscripted execution of the current
+   scenario's mandate that reaches the end-state below.
 2. **Invariants.** Properties that hold during, before, and after the
    golden run.
 3. **Quality gates.** Specific responses to the QA scenarios in
    [06-atam](06-atam.md).
+4. **Loop closure.** Realize → analyze → nuke completes with zero
+   platform-gap tasks filed during the analyze phase (§14).
 
 Every criterion gets a recipe — a sequence of Playwright / OTel /
 HTTP / curl actions that pass-or-fail deterministically. Recipes that
@@ -35,15 +40,54 @@ proclamations, no decisions, no graph nodes. One affordance is
 visible: a proclamation field. The rest of the UI shows empty states,
 not zeros.
 
-Augustus types:
+The current validation scenario is **design Uber**. Augustus types:
 
-> *"Users can listen to music, see lyrics scroll alongside the track,
-> and start a shared listening jam with a friend."*
+> *"Design Uber. Riders request rides; drivers accept and complete
+> them; pricing surges when demand outstrips supply. One pod is the
+> real-world simulator — it generates rider requests, simulates
+> driver locations and movement, and adjudicates trip outcomes — so
+> the rest of the swarm has a world to react to."*
 
 He clicks Proclaim. From that moment, the criteria in §1–§11 below
-hold. Within roughly **30 minutes** of wall time, Augustus can open
-a deployed multi-pod app and try the three features named in the
-proclamation.
+hold. Within roughly **45 minutes** of wall time, Augustus can open
+the deployed multi-pod app and watch a simulated ride flow
+end-to-end (request → match → in-progress → completed) and watch a
+surge-pricing event fire when the simulator pumps demand.
+
+> Earlier scenarios (Spotify-clone — listen / lyrics / shared jam)
+> remain on record under `runs/<YYYY-MM-scenario>/notes.md`. Each
+> pass picks a new scenario that exercises senate strategies and
+> observability surfaces the previous one did not. See §14.
+
+---
+
+## §0.5 — The simulator pod role
+
+For scenarios that need a feed of synthetic real-world events
+(rides, traffic, weather, stock ticks, sensor readings), the
+proclamation reserves one pod as the **simulator** — also called
+oracle, environment, or real-world feed, whichever fits the domain.
+The simulator is a normal pod: admitted via the senate, named by
+itself, capable of being exiled.
+
+- [ ] **The proclamation names the simulator role.** The simulator
+      role is mandated by the proclamation text, never hard-coded
+      into the platform.
+- [ ] **The simulator pod is admitted via the senate**, never
+      pre-spawned. The platform code path that admits the simulator
+      is the same as for every other pod.
+- [ ] **The simulator's HTTP traffic generates real OTel call
+      edges** to every consumer pod. The Glance graph shows the
+      simulator as a hub.
+- [ ] **The simulator's reasoning is visible in Witness.** Surge
+      events, driver allocations, and adjudicated outcomes appear
+      as agent turns in its pod drawer and (when they affect peers)
+      in council threads.
+- [ ] **The simulator is not necessarily the first pod.** The first
+      pod (§3) is whichever role the founding agent picks from the
+      proclamation; the simulator may be that pod or may be
+      proposed later. Either way, §3's bootstrap rules apply
+      identically — no special-case path.
 
 ---
 
@@ -80,8 +124,9 @@ proclamation.
 ## §3 — First-pod bootstrap
 
 - [ ] **The first pod renames itself** when its role becomes clear —
-      `frontend`, `web`, `music-ui`, or whatever the agent decides
-      from the proclamation. The display-role on the graph updates in
+      whatever the agent decides from the proclamation (e.g. for
+      Uber, `rider-app` / `dispatch` / `simulator`; for Spotify,
+      `web` / `music-ui`). The display-role on the graph updates in
       real time. The pod's stable id never changes.
 - [ ] **The first pod proposes admission** via the senate. The
       proposal shows on the Witness senate band with: kind, one-line
@@ -119,10 +164,11 @@ This is the single criterion that most justifies v2's existence.
 ## §5 — Many pods (the test conditions for §4)
 
 - [ ] **Between 5 and 10 pods admitted** by the end of the golden run.
-      The Spotify mandate naturally pulls toward: `web` / `frontend`,
-      `auth`, `catalog`, `lyrics`, `jam` (or `social`), `transcode` (or
-      `streaming`), plus likely an adopted `postgres` and an adopted
-      `meilisearch`. The exact split is the agents' decision.
+      For the Uber scenario, the natural split is roughly:
+      `rider-app`, `driver-app`, `dispatch`, `pricing`, `simulator`,
+      plus likely an adopted `postgres` for trip storage and an
+      adopted `redis` for live driver locations. The exact split is
+      the agents' decision.
 - [ ] **At least one adopted pod** runs in the golden run (an OSS
       image managed by an agent sidecar with privileged access). The
       most natural candidate is `postgres:16`.
@@ -140,7 +186,8 @@ This is the single criterion that most justifies v2's existence.
 
 - [ ] **At least one council is convened** during the golden run.
       Most naturally during the early architectural debate
-      ("who owns lyrics?").
+      (e.g. "who owns the trip ledger?" / "who owns lyrics?",
+      whichever the scenario surfaces).
 - [ ] **The council appears as a thread in Witness** with named
       participants, time-ordered messages, sender identity. Messages
       appear within 1 s of being posted.
@@ -174,12 +221,15 @@ This is the single criterion that most justifies v2's existence.
 - [ ] **Augustus can open the deployed app** from the Try
       perspective in one click. The Try view lists every pod with a
       public HTTP service, hostname, and one-click open.
-- [ ] **The music UI loads** (whatever the agents shipped). Listening
-      to one of the demo tracks works in the browser. Lyrics scroll
-      while a track plays. A shared-listening / jam feature is
-      reachable.
-- [ ] **The Spotify clone need not be pretty.** Quality of the
-      *platform's observability* is the bar, not the music UI.
+- [ ] **A ride can be hailed.** The rider-app accepts a destination,
+      the dispatch pod allocates a driver from the simulator's
+      pool, and the trip transitions through accept → in-progress
+      → completed within ~60 s of simulated time.
+- [ ] **Surge pricing visibly fires.** The simulator pumps demand;
+      the pricing pod raises rates; the rider-app reflects the
+      multiplier on the next quote.
+- [ ] **The Uber clone need not be pretty.** Quality of the
+      *platform's observability* is the bar, not the rider UI.
 
 ---
 
@@ -256,8 +306,12 @@ Spot-checked here:
 Things v2 acceptance explicitly does *not* require, to avoid scope
 creep:
 
-- A polished Spotify-clone front-end.
-- Real music licensing — clips are demo / canned.
+- A polished scenario front-end. Whatever the swarm ships — Uber
+  clone, Spotify clone, anything else — can be a list and a button.
+  Aesthetics are not a platform-acceptance gate.
+- Real domain integrations (maps, music licensing, payment rails,
+  sensor feeds, …). The simulator pod stands in for any external
+  world the scenario needs.
 - Multi-tenant conclave.
 - Auth / authz inside the platform.
 - The CLI wizard (deferred per [00-vision](00-vision.md)).
@@ -270,24 +324,97 @@ creep:
 
 ---
 
+## §14 — Realize → Analyze → Nuke
+
+v2 is not done after one passing golden run. v2 is done when the
+loop below closes with **zero new platform-gap tasks**.
+
+**Platform-gap** (the term that decides loop termination): a task is
+a platform-gap if it asks the *platform* — not the scenario, not the
+swarm's app — to change. Concretely, a task is a platform-gap iff
+addressing it requires editing one or more of:
+
+- `libs/conclave-core/` (events, models, bus, schemas)
+- `services/observer/` (commands, projections, state endpoints,
+  reactors, SSE feed, the OTel ACL)
+- `services/mcp-*/` (any MCP server's tools or reactors)
+- `pods/_template/` or `pods/_adopted_template/` (the agent
+  bootstrap, charter scaffolding, OTel wiring)
+- `services/forum/` (any Forum perspective, component, or theme
+  surface listed in §1–§11)
+- `infra/` (compose, Traefik dynamic, Tempo, OTel collector,
+  Postgres init)
+- `kickstart.sh` / `teardown.sh` / acceptance recipes
+
+By contrast, **scenario-gaps** are filed against the swarm's
+workspace (the pod code the agents wrote — `pods/<id>/workspace/`,
+charters, decisions) and do **not** count toward the loop's
+termination. **Polish-gaps** that are pure copy / colour / spacing
+inside the Forum are platform-gaps only if they violate a §1–§11
+checkbox; otherwise they're filed to the backlog and do not block
+loop closure.
+
+Each pass of the loop:
+
+1. **Realize.** Start with a genuinely clean state. `bash
+   kickstart.sh`, issue the current scenario's proclamation, let
+   the swarm run to acceptance. The architect observes; only
+   Augustus intervenes (J6/J7: DMs, charter edits, imperial
+   votes).
+
+2. **Analyze.** Capture observations as markdown notes in
+   `runs/<YYYY-MM-scenario>/notes.md`:
+   - Which §1–§13 criteria passed cleanly, which limped, which
+     failed.
+   - Which agent turns surfaced personality (debates, dissent,
+     style). Quote them verbatim — personality is core to the
+     product (see [00-vision](00-vision.md)).
+   - Which UI surfaces were unreadable, ambiguous, or
+     non-clickable. Be specific.
+   - Which platform behaviours were stubbed, placeholder, dummy,
+     or "TODO later." File each as a kanban task before the next
+     pass starts.
+
+3. **Nuke.** `bash teardown.sh`, remove the `postgres_data`,
+   `nats_data`, `tempo_data` volumes, and prune any leftover
+   `conclave-*` containers. The next pass starts on a fresh
+   machine state. The `runs/<YYYY-MM-scenario>/` notes are kept
+   in git.
+
+The loop terminates when an analyze phase files zero new tasks. At
+that point v2 is done.
+
+Each new scenario must exercise senate strategies and observability
+surfaces the previous one did not. The pass-picker tracks which
+boxes a scenario lights up, by column:
+
+| Pass | Scenario | New strategy fires | New surfaces stressed | Notes path |
+|------|----------|--------------------|------------------------|------------|
+| 1 | Spotify-clone (listen / lyrics / jam) | majority, supermajority, consensus_omnium, sortition | Glance call edges, Witness council thread, Try app | scrapped before §14 codified — no notes captured |
+| 2 | Design Uber (rides / surge / simulator) | re-runs all four under load | Simulator pod (§0.5), call edges with a hub topology, surge as an emitted event | `runs/2026-05-uber/` |
+
+---
+
 ## What "done" sounds like
 
 When the architect can:
 
-1. Clone the v2 branch on a fresh machine.
+1. Clone the current version branch on a fresh machine.
 2. Run `bash kickstart.sh`.
 3. Open the Forum.
-4. Type the Spotify-clone proclamation.
-5. Watch for ~30 minutes without intervening:
-   - 5–10 pods admitted via real senate votes that exercise multiple
-     strategies,
+4. Type the current scenario's proclamation.
+5. Watch for ~45 minutes without intervening:
+   - 5–10 pods admitted via real senate votes that exercise
+     multiple strategies, one of which is the simulator,
    - councils visibly debate the architecture,
-   - call edges light up between pods,
-   - `postgres:16` runs as an adopted pod,
-   - the deployed app opens on `localhost` and the three named
-     features work.
+   - call edges light up between pods (the simulator is a hub),
+   - at least one OSS image runs as an adopted pod,
+   - the deployed app opens on `localhost` and the scenario's
+     core flow works end-to-end.
 6. Click any node in the Glance graph and traverse its neighbours
    to any other node via the drawer.
+7. Re-run the loop on the next scenario without filing new
+   platform-gap tasks.
 
 …then v2 is done.
 
@@ -296,3 +423,5 @@ If any of the following are true at that point, v2 is not done:
 - "Why is this still custom code?"
 - "Where's the meeting transcript?"
 - "Why is there a port number anywhere on screen?"
+- "The simulator didn't show its reasoning."
+- "I filed a task during analyze." → run the loop again.

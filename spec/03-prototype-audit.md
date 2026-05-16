@@ -213,7 +213,7 @@ that's harder than what it labels."
 
 1. **OSS first.** Every layer where an OSS substrate exists, we use it.
 2. **Many pods, or no senate to test.** Plan for ~6–10 pods in the
-   Spotify demo, not 2.
+   validation demo (Spotify, Uber, …), not 2.
 3. **Pod ≠ image.** Agent picks the service shape; code or adopted.
 4. **Watchability is the deliverable.** Live token streams, meeting
    minutes, call graph, all visible.
