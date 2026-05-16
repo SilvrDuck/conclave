@@ -10,12 +10,11 @@ Spec ref: spec/02-event-storming.md Phase 3, spec/06-atam.md S4 + M1.
 
 from __future__ import annotations
 
+import math
 import random
 from dataclasses import dataclass
 
 from conclave_core.models import ProposalOutcome, StrategyName, VoteChoice
-
-SUPERMAJORITY_RATIO = 2 / 3
 
 
 @dataclass(frozen=True)
@@ -81,7 +80,9 @@ def _supermajority(ctx: StrategyContext) -> ProposalOutcome | None:
     ballots = ctx.ballots
     yes = sum(1 for v in ballots.values() if v == VoteChoice.YES)
     no = sum(1 for v in ballots.values() if v == VoteChoice.NO)
-    threshold = int(len(eligible) * SUPERMAJORITY_RATIO) + 1
+    # Ceil(2/3 N): smallest YES count that meets ≥ 2/3 of eligible.
+    # For N=3 → 2, N=6 → 4, N=9 → 6, N=1 → 1.
+    threshold = math.ceil(len(eligible) * 2 / 3)
 
     if yes >= threshold:
         return ProposalOutcome.APPROVED

@@ -34,6 +34,31 @@ SENATE_CONTEXT = "senate"
 DEFAULT_DEADLINE = timedelta(minutes=5)
 
 
+def _affected_for(kind: str, payload: dict[str, Any]) -> list[str]:
+    """Compute `ProposalClosed.affected` from the proposal's kind + payload.
+
+    Downstream policies key off `affected` — Pod Lifecycle for admission /
+    exile / image_swap; Decisions for contract_change; Operator (proclamation
+    completion) for completion. None of them want the electorate.
+    """
+    match kind:
+        case ProposalKind.ADMISSION.value | ProposalKind.EXILE.value | ProposalKind.IMAGE_SWAP.value:
+            pid = payload.get("pod_id")
+            return [pid] if pid else []
+        case ProposalKind.CONTRACT_CHANGE.value:
+            # The endpoints' owning pods are what downstream needs.
+            endpoints = payload.get("endpoints") or []
+            pods = {
+                e.get("pod_id") for e in endpoints if isinstance(e, dict) and e.get("pod_id")
+            }
+            return sorted(pods)
+        case ProposalKind.COMPLETION.value:
+            seq = payload.get("proclamation_seq")
+            return [f"proclamation:{seq}"] if seq is not None else []
+        case _:
+            return []
+
+
 @dataclass(frozen=True)
 class ProposalArgs:
     kind: ProposalKind
@@ -133,28 +158,32 @@ class SenateService:
         choice: VoteChoice,
         comment: str | None = None,
     ) -> None:
+        # All reads + inserts in one txn so FOR UPDATE actually holds the lock.
         async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                """SELECT outcome, eligible_voters
-                     FROM senate.proposals WHERE proposal_id = $1
-                     FOR UPDATE""",
-                proposal_id,
-            )
-            if row is None:
-                raise ValueError(f"unknown proposal_id: {proposal_id}")
-            if row["outcome"] != "open":
-                raise ValueError(f"proposal {proposal_id} is already {row['outcome']}")
-            if voter not in row["eligible_voters"]:
-                raise ValueError(f"voter {voter} not eligible for {proposal_id}")
-            await conn.execute(
-                """INSERT INTO senate.ballots(proposal_id, voter, choice, comment)
-                   VALUES($1, $2, $3, $4)
-                   ON CONFLICT (proposal_id, voter) DO NOTHING""",
-                proposal_id,
-                voter,
-                choice.value,
-                comment,
-            )
+            async with conn.transaction():
+                row = await conn.fetchrow(
+                    """SELECT outcome, eligible_voters
+                         FROM senate.proposals WHERE proposal_id = $1
+                         FOR UPDATE""",
+                    proposal_id,
+                )
+                if row is None:
+                    raise ValueError(f"unknown proposal_id: {proposal_id}")
+                if row["outcome"] != "open":
+                    raise ValueError(
+                        f"proposal {proposal_id} is already {row['outcome']}"
+                    )
+                if voter not in row["eligible_voters"]:
+                    raise ValueError(f"voter {voter} not eligible for {proposal_id}")
+                await conn.execute(
+                    """INSERT INTO senate.ballots(proposal_id, voter, choice, comment)
+                       VALUES($1, $2, $3, $4)
+                       ON CONFLICT (proposal_id, voter) DO NOTHING""",
+                    proposal_id,
+                    voter,
+                    choice.value,
+                    comment,
+                )
         await self._bus.publish_event(
             BallotCast(
                 proposal_id=proposal_id, voter=voter, choice=choice, comment=comment
@@ -221,15 +250,12 @@ class SenateService:
                     outcome.value,
                 )
 
-                # affected = whoever this proposal touches; for admission it's
-                # the candidate (stored in payload.pod_id); else the eligible set.
-                affected: list[str] = []
-                if row["kind"] == ProposalKind.ADMISSION.value:
-                    pid = payload.get("pod_id")
-                    if pid:
-                        affected = [pid]
-                else:
-                    affected = list(row["eligible_voters"])
+                # affected = whoever this proposal *changes*, not who voted on it.
+                # Spec §C2: downstream policies (Pod Lifecycle on admission/exile,
+                # Decisions on contract changes, Operator on completion) key off
+                # `affected`. Eligible voters are tracked separately on the
+                # proposal itself.
+                affected = _affected_for(row["kind"], payload)
 
         await self._bus.publish_event(
             ProposalClosed(

@@ -52,15 +52,15 @@ async def lifespan(server: FastMCP):
             await deadline.start()
 
             async def on_cast_ballot_cmd(data: dict[str, Any]) -> None:
-                try:
-                    await service.cast_ballot(
-                        proposal_id=data["proposal_id"],
-                        voter=data.get("voter", AUGUSTUS),
-                        choice=VoteChoice(data["choice"]),
-                        comment=data.get("comment"),
-                    )
-                except Exception:
-                    log.exception("CastBallot cmd handler failed")
+                # Let `Bus.subscribe` nak() on exception (validation, missing
+                # proposal, etc.). Swallowing here would ack-and-forget — those
+                # commands would silently vanish.
+                await service.cast_ballot(
+                    proposal_id=data["proposal_id"],
+                    voter=data.get("voter", AUGUSTUS),
+                    choice=VoteChoice(data["choice"]),
+                    comment=data.get("comment"),
+                )
 
             await bus.subscribe(
                 "conclave.commands.senate.CastBallot",
