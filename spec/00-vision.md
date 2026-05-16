@@ -5,12 +5,21 @@
 ## What conclave is
 
 Conclave is a **consensus-driven, orchestrator-free platform for building
-microservice projects with autonomous AI agents**. The architect of the
-platform stays general-purpose; *the demo* (a Spotify-clone) is just the
-v2 acceptance scenario, never something the platform's design caters to.
+microservice projects with autonomous AI agents** — and, equally, a
+tool for **seeing precisely what those agents are doing**: their
+debates, their dissent, the personality that surfaces in their
+decisions. The platform stays general-purpose; *the demos* (Spotify
+clone, design Uber, …) are validation scenarios, never something the
+platform's design caters to.
 
-> v2's deliverable is the **platform**, not the music app.
-> The Spotify-clone is exercise weight, not the product.
+> v2's deliverable is the **platform**, not whichever app the swarm
+> builds. The validation scenarios are exercise weight, not the
+> product.
+>
+> The product is the platform **and** the visibility it gives an
+> architect into the swarm. Personality expressed in agent
+> decisions — quoted council messages, dissenting votes, charter
+> rewrites — is core surface area, not flavour text.
 
 The mental model from v1 carries over and gets sharpened:
 
@@ -92,18 +101,22 @@ These are the load-bearing reframings. Each gets a fuller treatment in
 - Cross-pod integration tests as a platform feature.
 - Live mid-flight stack swaps.
 - Multi-tenant conclave.
-- A polished Spotify-clone. (We need it to come up and exercise the
-  platform; we don't need it to be beautiful.)
+- A polished scenario front-end (Spotify clone, Uber clone, …).
+  We need each scenario to come up and exercise the platform; we
+  don't need it to be beautiful.
 
 ## The v2 acceptance shape
 
 Detailed criteria in [08-v2-acceptance](08-v2-acceptance.md). One-line
-summary: the architect issues a feature-shaped proclamation
-("users can listen to music, see lyrics scroll, and start a shared jam
-with a friend"); a small swarm of agents discovers the service split,
+summary: the architect issues a feature-shaped proclamation (e.g.
+"design Uber — riders, drivers, surge, one pod simulates the real
+world"); a small swarm of agents discovers the service split,
 debates it visibly in councils, ships a working multi-service
 deployment, and Augustus can read the meeting minutes, see the live
-call graph, click any node to traverse its neighbours, and try the app.
+call graph, click any node to traverse its neighbours, and try the
+app. v2 ships only when the **realize → analyze → nuke** loop (§14
+of 08) closes with zero platform-gap tasks filed in the analyze
+phase.
 
 If the architect at any point goes "I cannot tell what's happening" or
 "why is this still custom code" — v2 isn't done.
