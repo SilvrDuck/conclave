@@ -39,6 +39,10 @@ ENABLE_AGENT = os.environ.get("ENABLE_AGENT", "false").lower() == "true"
 # Fixed argv for the workspace process — no shell, no env-driven command
 # string. The agent influences shape via the workspace files it writes,
 # not via SERVICE_CMD env.
+# uvicorn --reload forks a child watcher process which loses the
+# opentelemetry-instrument wrapper, so OTel spans never flow. We rely
+# on Docker container restart (compose up --build) for code reloads
+# during demos.
 SERVICE_ARGV = (
     "opentelemetry-instrument",
     "uvicorn",
@@ -47,7 +51,6 @@ SERVICE_ARGV = (
     "0.0.0.0",
     "--port",
     SERVICE_PORT,
-    "--reload",
 )
 
 # Track the currently-running service subprocess so SIGTERM can stop it.
