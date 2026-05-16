@@ -207,7 +207,9 @@ class ObservationService:
                        runtime_status, main_image)
                    VALUES($1, $2, $3, $4, $5)
                    ON CONFLICT (pod_id) DO UPDATE
-                       SET runtime_status = EXCLUDED.runtime_status,
+                       SET display_role = EXCLUDED.display_role,
+                           image_strategy = EXCLUDED.image_strategy,
+                           runtime_status = EXCLUDED.runtime_status,
                            main_image = COALESCE(EXCLUDED.main_image, observer.pod_state.main_image),
                            last_seen = now()""",
                 pod_id,
