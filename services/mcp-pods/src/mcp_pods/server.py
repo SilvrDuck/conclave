@@ -14,6 +14,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from mcp_pods.service import PodsService
+from mcp_pods.spawner import build_template_image
 
 log = logging.getLogger("mcp-pods")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -28,12 +29,25 @@ async def lifespan(server: FastMCP):
     async with conclave_pool(schema="pods", min_size=1, max_size=5) as pool:
         async with Bus.connect(nats_url()) as bus:
             service = PodsService(pool=pool, bus=bus)
+            # Pre-build the pod-template image so SpawnFirstPod can bring
+            # a pod up in seconds (no docker build on the critical path
+            # of spec/08 §2's 5s budget).
+            try:
+                await build_template_image()
+            except Exception:
+                log.exception(
+                    "template image pre-build failed; SpawnFirstPod will "
+                    "still try, but the first spawn will be slow"
+                )
 
             async def on_proposal_closed(data: dict[str, Any]) -> None:
                 await service.on_proposal_closed(data)
 
             async def on_pod_exited(data: dict[str, Any]) -> None:
                 await service.on_pod_exited(data)
+
+            async def on_proclamation_issued(data: dict[str, Any]) -> None:
+                await service.on_proclamation_issued(data)
 
             await bus.subscribe(
                 "conclave.events.senate.ProposalClosed",
@@ -44,6 +58,11 @@ async def lifespan(server: FastMCP):
                 "conclave.events.pods.PodExited",
                 on_pod_exited,
                 durable="mcp-pods-exit",
+            )
+            await bus.subscribe(
+                "conclave.events.operator.ProclamationIssued",
+                on_proclamation_issued,
+                durable="mcp-pods-spawn-first",
             )
             yield {"service": service}
 

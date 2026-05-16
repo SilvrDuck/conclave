@@ -22,6 +22,7 @@ from conclave_core.events import (
 )
 from conclave_core.models import ImageStrategy
 
+from mcp_pods.spawner import SpawnError, mint_pod_id, spawn_pod
 from mcp_pods.traefik import remove_rule, write_rule
 
 log = logging.getLogger("mcp-pods.service")
@@ -228,6 +229,51 @@ class PodsService:
             remove_rule(dynamic_dir=traefik_dynamic_dir(), pod_id=pod_id)
         except OSError:
             log.exception("failed to remove Traefik rule for %s", pod_id)
+
+    async def on_proclamation_issued(self, _data: dict[str, Any]) -> None:
+        """SpawnFirstPod policy — spec/02 Phase 1 last row.
+
+        Race-safe under NATS redelivery via a transaction-scoped
+        Postgres advisory lock. asyncpg's default isolation is READ
+        COMMITTED, so a plain COUNT+INSERT lets two concurrent
+        deliveries each see zero pods and both insert new pod_ids
+        (different PKs, so no unique-constraint backstop). The
+        advisory lock serialises the check-and-claim instead.
+        """
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                # Lock key derived from the policy name; the same key
+                # for every delivery so concurrent calls queue.
+                await conn.execute(
+                    "SELECT pg_advisory_xact_lock("
+                    "hashtextextended('mcp-pods:spawn-first', 0)"
+                    ")"
+                )
+                n = await conn.fetchval(
+                    "SELECT COUNT(*) FROM pods.pods WHERE NOT exiled"
+                )
+                if n > 0:
+                    return
+                pod_id = mint_pod_id()
+                display_role = "tbd"
+                await conn.execute(
+                    """INSERT INTO pods.pods(pod_id, display_role, image_strategy)
+                       VALUES($1, $2, 'code')""",
+                    pod_id,
+                    display_role,
+                )
+        log.info("SpawnFirstPod claiming %s", pod_id)
+        try:
+            await spawn_pod(pod_id, display_role)
+        except SpawnError:
+            log.exception("SpawnFirstPod failed for %s", pod_id)
+            # Roll the placeholder back so a retry can re-claim.
+            async with self._pool.acquire() as conn:
+                await conn.execute(
+                    "DELETE FROM pods.pods WHERE pod_id = $1 AND NOT admitted",
+                    pod_id,
+                )
+            raise
 
     # ─── reads ──────────────────────────────────────────────────────────
 

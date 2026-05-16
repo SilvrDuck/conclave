@@ -221,6 +221,13 @@ services:
       NATS_URL: nats://nats:4222
       TRAEFIK_DYNAMIC_DIR: /traefik-dynamic
       COMPOSE_PROJECT_DIR: /workspace
+      COMPOSE_FILE_REL: infra/compose.yaml
+      # Host paths plumbed in by kickstart.sh. mcp-pods reads these when
+      # spawning pods because the daemon resolves bind-mounts against the
+      # host filesystem, not the mcp-pods container's view.
+      HOST_PROJECT_DIR: ${HOST_PROJECT_DIR:-}
+      HOST_CLAUDE_CREDENTIALS: ${HOST_CLAUDE_CREDENTIALS:-}
+      HOST_CLAUDE_VERSIONS: ${HOST_CLAUDE_VERSIONS:-}
     depends_on:
       postgres:
         condition: service_healthy
