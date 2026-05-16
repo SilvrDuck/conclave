@@ -233,6 +233,20 @@ services:
     ports:
       - "8105:8000"
 
+  # ── pods (per-pod profile, one each) ───────────────────────────────
+  frontend:
+    profiles: ["pod-frontend"]
+    build:
+      context: ../pods/frontend
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POD_ID: frontend
+      DISPLAY_ROLE: frontend
+      MCP_PODS_URL: http://mcp-pods:8000/mcp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      ENABLE_AGENT: "false"
+
   forum-ui:
     profiles: ["conclave"]
     build:
