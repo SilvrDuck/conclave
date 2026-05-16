@@ -5,6 +5,7 @@ Spec ref: spec/05-ddd-contexts.md §C6.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import secrets
@@ -229,6 +230,47 @@ class PodsService:
             remove_rule(dynamic_dir=traefik_dynamic_dir(), pod_id=pod_id)
         except OSError:
             log.exception("failed to remove Traefik rule for %s", pod_id)
+
+    async def on_pod_admitted(self, data: dict[str, Any]) -> None:
+        """BroadcastMembership policy — spec/02 Phase 3.
+
+        Fanout the new pod's membership into every existing peer's
+        inbox so the swarm doesn't have to poll state.members. The
+        published subject is core NATS (conclave.inbox.<peer_id>),
+        matching the per-pod subscription in pods/_template/agent/
+        bootstrap.py. Not JetStream — the inbox is best-effort fanout,
+        not durable state; persistent peers will catch up via state
+        reads when they boot."""
+        new_pod = data["pod_id"]
+        new_role = data["display_role"]
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT pod_id FROM pods.pods
+                    WHERE admitted AND NOT exiled AND pod_id <> $1""",
+                new_pod,
+            )
+        if not rows:
+            return
+        body = json.dumps(
+            {
+                "event_type": "MembershipChange",
+                "action": "admitted",
+                "pod_id": new_pod,
+                "display_role": new_role,
+                "occurred_at": data.get("occurred_at"),
+            }
+        ).encode()
+        peer_ids = [r["pod_id"] for r in rows]
+        for peer in peer_ids:
+            try:
+                await self._bus.nc.publish(f"conclave.inbox.{peer}", body)
+            except Exception:
+                log.exception("inbox fanout to %s failed", peer)
+        log.info(
+            "BroadcastMembership: new pod %s announced to %d peers",
+            new_pod,
+            len(peer_ids),
+        )
 
     async def on_proclamation_issued(self, _data: dict[str, Any]) -> None:
         """SpawnFirstPod policy — spec/02 Phase 1 last row.
