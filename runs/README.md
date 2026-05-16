@@ -17,7 +17,7 @@ Naming: `runs/<YYYY-MM>-<scenario-slug>/`.
 
 | Pass | Scenario | Status |
 |------|----------|--------|
-| 1 | Spotify-clone (listen / lyrics / jam) | archived |
+| 1 | Spotify-clone (listen / lyrics / jam) | scrapped before §14 codified — no notes captured |
 | 2 | Design Uber (rides / surge / simulator) | next |
 
 When the analyze phase of a pass files zero new platform-gap tasks,

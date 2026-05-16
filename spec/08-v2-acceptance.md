@@ -83,6 +83,11 @@ itself, capable of being exiled.
       events, driver allocations, and adjudicated outcomes appear
       as agent turns in its pod drawer and (when they affect peers)
       in council threads.
+- [ ] **The simulator is not necessarily the first pod.** The first
+      pod (§3) is whichever role the founding agent picks from the
+      proclamation; the simulator may be that pod or may be
+      proposed later. Either way, §3's bootstrap rules apply
+      identically — no special-case path.
 
 ---
 
@@ -119,8 +124,9 @@ itself, capable of being exiled.
 ## §3 — First-pod bootstrap
 
 - [ ] **The first pod renames itself** when its role becomes clear —
-      `frontend`, `web`, `music-ui`, or whatever the agent decides
-      from the proclamation. The display-role on the graph updates in
+      whatever the agent decides from the proclamation (e.g. for
+      Uber, `rider-app` / `dispatch` / `simulator`; for Spotify,
+      `web` / `music-ui`). The display-role on the graph updates in
       real time. The pod's stable id never changes.
 - [ ] **The first pod proposes admission** via the senate. The
       proposal shows on the Witness senate band with: kind, one-line
@@ -180,7 +186,8 @@ This is the single criterion that most justifies v2's existence.
 
 - [ ] **At least one council is convened** during the golden run.
       Most naturally during the early architectural debate
-      ("who owns lyrics?").
+      (e.g. "who owns the trip ledger?" / "who owns lyrics?",
+      whichever the scenario surfaces).
 - [ ] **The council appears as a thread in Witness** with named
       participants, time-ordered messages, sender identity. Messages
       appear within 1 s of being posted.
@@ -299,9 +306,12 @@ Spot-checked here:
 Things v2 acceptance explicitly does *not* require, to avoid scope
 creep:
 
-- A polished scenario front-end (Uber clone or Spotify clone). The
-  rider UI can be a list and a button.
-- Real maps / routing — the simulator generates synthetic positions.
+- A polished scenario front-end. Whatever the swarm ships — Uber
+  clone, Spotify clone, anything else — can be a list and a button.
+  Aesthetics are not a platform-acceptance gate.
+- Real domain integrations (maps, music licensing, payment rails,
+  sensor feeds, …). The simulator pod stands in for any external
+  world the scenario needs.
 - Multi-tenant conclave.
 - Auth / authz inside the platform.
 - The CLI wizard (deferred per [00-vision](00-vision.md)).
@@ -318,6 +328,31 @@ creep:
 
 v2 is not done after one passing golden run. v2 is done when the
 loop below closes with **zero new platform-gap tasks**.
+
+**Platform-gap** (the term that decides loop termination): a task is
+a platform-gap if it asks the *platform* — not the scenario, not the
+swarm's app — to change. Concretely, a task is a platform-gap iff
+addressing it requires editing one or more of:
+
+- `libs/conclave-core/` (events, models, bus, schemas)
+- `services/observer/` (commands, projections, state endpoints,
+  reactors, SSE feed, the OTel ACL)
+- `services/mcp-*/` (any MCP server's tools or reactors)
+- `pods/_template/` or `pods/_adopted_template/` (the agent
+  bootstrap, charter scaffolding, OTel wiring)
+- `services/forum/` (any Forum perspective, component, or theme
+  surface listed in §1–§11)
+- `infra/` (compose, Traefik dynamic, Tempo, OTel collector,
+  Postgres init)
+- `kickstart.sh` / `teardown.sh` / acceptance recipes
+
+By contrast, **scenario-gaps** are filed against the swarm's
+workspace (the pod code the agents wrote — `pods/<id>/workspace/`,
+charters, decisions) and do **not** count toward the loop's
+termination. **Polish-gaps** that are pure copy / colour / spacing
+inside the Forum are platform-gaps only if they violate a §1–§11
+checkbox; otherwise they're filed to the backlog and do not block
+loop closure.
 
 Each pass of the loop:
 
@@ -350,12 +385,13 @@ The loop terminates when an analyze phase files zero new tasks. At
 that point v2 is done.
 
 Each new scenario must exercise senate strategies and observability
-surfaces the previous one did not. Order so far:
+surfaces the previous one did not. The pass-picker tracks which
+boxes a scenario lights up, by column:
 
-| Pass | Scenario | Year-month | Notes path |
-|------|----------|------------|------------|
-| 1 | Spotify-clone (listen / lyrics / jam) | 2026-04 | `runs/2026-04-spotify/` |
-| 2 | Design Uber (rides / surge / simulator) | 2026-05 | `runs/2026-05-uber/` |
+| Pass | Scenario | New strategy fires | New surfaces stressed | Notes path |
+|------|----------|--------------------|------------------------|------------|
+| 1 | Spotify-clone (listen / lyrics / jam) | majority, supermajority, consensus_omnium, sortition | Glance call edges, Witness council thread, Try app | scrapped before §14 codified — no notes captured |
+| 2 | Design Uber (rides / surge / simulator) | re-runs all four under load | Simulator pod (§0.5), call edges with a hub topology, surge as an emitted event | `runs/2026-05-uber/` |
 
 ---
 

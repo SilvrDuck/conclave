@@ -76,7 +76,7 @@ when a second arrives.
 
 | ID | Scenario | Response measure |
 |---|---|---|
-| MA1 | The Spotify demo spawns 8 pods. | All 8 boot within 60 s; UI graph renders without lag. |
+| MA1 | A validation scenario spawns 5–10 pods. | All boot within 60 s; UI graph renders without lag. |
 | MA2 | A `consensus_omnium` vote with 5 affected voters runs. | All 5 are wakeable, ballots collected, proposal closes. |
 | MA3 | A `sortition` vote draws 3 random voters from 8 admitted pods. | The draw is shown in the UI cartouche; only drawn voters are eligible. |
 
@@ -118,7 +118,7 @@ when a second arrives.
 | **T2** OTel everywhere vs custom bus-tap | OTel adds collector + Tempo to the stack | Custom is lighter | OTel | QA1 (watchability — real call edges) and QA2 (OSS) trump operational footprint. The custom v1 approach was wrong. |
 | **T3** React Flow vs hand-rolled SVG | React Flow constrains visual style | SVG max freedom | React Flow | QA6 (modifiability) and QA2 win. We can theme React Flow custom nodes; we can't rebuild 1188 lines per UI change. |
 | **T4** ≥2 candidates per slot upfront vs build-when-needed | Pre-built proves the abstraction | Pre-built is dead code | Build-when-needed (lean) | QA2 + QA6. v1's 18 unused adapters were a liability. Keep the *interface* tidy; ship the *second* implementation when real demand shows. |
-| **T5** Adopted pods (sidecar with root) vs code-only pods | Adopted pods are more powerful, but the sidecar has privileges | Code-only is simpler, less power | Both | QA1, QA5 win. The Spotify demo benefits from adopting `postgres:16` for catalog data instead of agents writing a fragile DB. Sidecar privileges are scoped to the main container only — not a network-wide concern. |
+| **T5** Adopted pods (sidecar with root) vs code-only pods | Adopted pods are more powerful, but the sidecar has privileges | Code-only is simpler, less power | Both | QA1, QA5 win. Any data-heavy validation scenario benefits from adopting `postgres:16` instead of agents writing a fragile DB. Sidecar privileges are scoped to the main container only — not a network-wide concern. |
 | **T6** Claude Code CLI vs in-process Agent SDK | CLI brings subprocess pain, but ships now | SDK is in-process, more visibility but more glue | CLI (architect's call) | QA2 (rent the CLI), QA8 (model dial available). Subprocess pain is real but bounded — see [03-prototype-audit](03-prototype-audit.md) L6. |
 | **T7** Many MCP servers (one per CRUD slice) vs few (one per context) | More servers = clearer boundaries | More servers = more processes, more wiring | Few (one per bounded context) | QA6 (modifiability), QA2 (less custom). [05-ddd-contexts](05-ddd-contexts.md) lands on 6 servers. |
 | **T8** Wizard UI vs zero-config bash | Wizard is friendlier but is a UI to maintain | Bash is brutal but fast | Zero-config bash, wizard deferred | QA4 for the architect; Augustus rarely bootstraps. Wizard returns later. |
