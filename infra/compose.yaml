@@ -247,6 +247,44 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       ENABLE_AGENT: "false"
 
+  # adopted pod: postgres:16 as the catalog DB, agent in sidecar.
+  catalog-db:
+    profiles: ["pod-catalog-db"]
+    image: postgres:16
+    container_name: pod-catalog-db
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POSTGRES_USER: catalog
+      POSTGRES_PASSWORD: catalog
+      POSTGRES_DB: catalog
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U catalog -d catalog"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  catalog-db-sidecar:
+    profiles: ["pod-catalog-db"]
+    build:
+      context: ../pods/catalog-db
+      dockerfile: sidecar/Dockerfile
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POD_ID: catalog-db
+      DISPLAY_ROLE: catalog-db
+      MAIN_CONTAINER: pod-catalog-db
+      MAIN_IMAGE: postgres:16
+      MCP_PODS_URL: http://mcp-pods:8000/mcp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      ENABLE_AGENT: "false"
+    depends_on:
+      catalog-db:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
   forum-ui:
     profiles: ["conclave"]
     build:
