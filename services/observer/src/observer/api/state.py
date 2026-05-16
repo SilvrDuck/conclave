@@ -345,6 +345,38 @@ async def list_pod_files(pod_id: str) -> dict[str, Any]:
     }
 
 
+@router.get("/pods/{pod_id}/turns")
+async def list_pod_turns(
+    request: Request, pod_id: str, limit: int = 20
+) -> list[dict[str, Any]]:
+    """Recent agent turns for a pod (most recent first). Used by the
+    Forum's Thinking tab to render J4's per-turn transcript."""
+    _validate_pod_id(pod_id)
+    limit = max(1, min(limit, 100))
+    pool = request.app.state.observer.pool
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT turn_id, started_at, ended_at, tokens_in, tokens_out
+                 FROM observer.agent_turns
+                WHERE pod_id = $1
+                ORDER BY started_at DESC
+                LIMIT $2""",
+            pod_id,
+            limit,
+        )
+    return [
+        {
+            "turn_id": r["turn_id"],
+            "started_at": r["started_at"].isoformat() if r["started_at"] else None,
+            "ended_at": r["ended_at"].isoformat() if r["ended_at"] else None,
+            "tokens_in": r["tokens_in"],
+            "tokens_out": r["tokens_out"],
+            "status": "ended" if r["ended_at"] else "in_flight",
+        }
+        for r in rows
+    ]
+
+
 @router.get("/spec/{filename}")
 async def get_spec_file(filename: str) -> dict[str, Any]:
     """Read a spec/<filename>.md so the Forum 'Spec' link can render
