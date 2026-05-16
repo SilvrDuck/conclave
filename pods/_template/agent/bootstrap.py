@@ -43,6 +43,8 @@ WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/pod/workspace"))
 SERVICE_PORT = os.environ.get("SERVICE_PORT", "8000")
 ENABLE_AGENT = os.environ.get("ENABLE_AGENT", "false").lower() == "true"
 CHARTER_PATH = Path("/pod/charter.md")
+SYSTEM_PREAMBLE_PATH = Path("/pod/system_preamble.md")
+COMPOSED_SYSTEM_PATH = Path("/pod/agent/system.md")
 MCP_CONFIG_PATH = "/pod/agent/mcp.json"
 def _resolve_claude_bin() -> str:
     """Locate the claude binary inside the pod.
@@ -176,18 +178,40 @@ def _build_prompt(pod_id: str, display_role: str, event_kind: str, event: dict) 
     )
 
 
+def _compose_system_prompt() -> Path:
+    """Concatenate the platform preamble (cross-pod rules) with the
+    pod's charter (its role) into a single file that Claude reads via
+    --append-system-prompt-file. Re-runs every turn so a charter edit
+    by Augustus picks up on the next Claude call without a restart."""
+    if not SYSTEM_PREAMBLE_PATH.exists():
+        raise FileNotFoundError(
+            f"system preamble missing at {SYSTEM_PREAMBLE_PATH} — "
+            "_template should COPY it in"
+        )
+    if not CHARTER_PATH.exists():
+        raise FileNotFoundError(
+            f"charter missing at {CHARTER_PATH} — pod_dir not rendered?"
+        )
+    COMPOSED_SYSTEM_PATH.parent.mkdir(parents=True, exist_ok=True)
+    preamble = SYSTEM_PREAMBLE_PATH.read_text()
+    charter = CHARTER_PATH.read_text()
+    COMPOSED_SYSTEM_PATH.write_text(preamble + "\n\n---\n\n" + charter)
+    return COMPOSED_SYSTEM_PATH
+
+
 async def _run_claude(pod_id: str, prompt: str) -> None:
     """Spawn one `claude -p` turn. Emits AgentTurnStarted before launch
     and AgentTurnEnded with usage on completion. Captures the session
     id on first run for `--resume` on subsequent turns."""
     global _session_id
+    system_path = _compose_system_prompt()
     cmd = [
         CLAUDE_BIN,
         "--print",
         "--output-format", "stream-json",
         "--include-partial-messages",
         "--mcp-config", MCP_CONFIG_PATH,
-        "--append-system-prompt-file", str(CHARTER_PATH),
+        "--append-system-prompt-file", str(system_path),
         "--dangerously-skip-permissions",
         "--effort", CLAUDE_EFFORT,
         "--model", CLAUDE_MODEL,

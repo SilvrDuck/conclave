@@ -34,6 +34,7 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 
 WORKDIR /pod
 COPY charter.md /pod/charter.md
+COPY system_preamble.md /pod/system_preamble.md
 COPY agent /pod/agent
 COPY workspace /pod/workspace
 
