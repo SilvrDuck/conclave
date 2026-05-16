@@ -25,7 +25,7 @@ export function ProclamationField() {
     <Flex gap="2" align="center">
       <TextField.Root
         size="3"
-        placeholder="Proclaim a direction… (e.g. 'users can listen to music, see lyrics scroll, jam together')"
+        placeholder="Proclaim a direction…"
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && submit()}

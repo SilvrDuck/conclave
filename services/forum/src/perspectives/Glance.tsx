@@ -1,8 +1,10 @@
 import { useMemo } from "react";
 import useSWR from "swr";
 import { ReactFlow, Background, Controls, Edge, Node, MarkerType } from "@xyflow/react";
-import { Box, Flex, Heading, Text, Badge } from "@radix-ui/themes";
+import { Box, Flex, Heading, Text, Badge, Separator } from "@radix-ui/themes";
 import { Call, Pod, ActivityRow, fetcher } from "../api";
+import { usePeek, type EntityRef } from "../components/PeekContext";
+import { Linkified } from "../components/Linkified";
 
 export function Glance({ onPodClick }: { onPodClick: (pod_id: string) => void }) {
   const { data: pods } = useSWR<Pod[]>("/state/pods", fetcher, { refreshInterval: 5000 });
@@ -12,6 +14,7 @@ export function Glance({ onPodClick }: { onPodClick: (pod_id: string) => void })
   const { data: activity } = useSWR<ActivityRow[]>("/state/activity?limit=40", fetcher, {
     refreshInterval: 5000,
   });
+  const { push } = usePeek();
 
   const { nodes, edges } = useMemo(() => buildGraph(pods ?? [], calls ?? []), [pods, calls]);
 
@@ -33,6 +36,7 @@ export function Glance({ onPodClick }: { onPodClick: (pod_id: string) => void })
             <Controls showInteractive={false} />
           </ReactFlow>
         )}
+        <NodeLegend />
       </Box>
       <Box className="w-80 border-l border-slate-800 p-3 overflow-y-auto">
         <Heading size="3" mb="2">
@@ -44,26 +48,129 @@ export function Glance({ onPodClick }: { onPodClick: (pod_id: string) => void })
           </Text>
         ) : (
           <Flex direction="column" gap="2">
-            {(activity ?? []).map((a) => (
-              <Box key={a.event_id} className="border-b border-slate-800 pb-2">
-                <Flex gap="2" align="center">
-                  <Badge color={badgeColor(a.event_type)} size="1">
-                    {a.event_type}
-                  </Badge>
-                  <Text size="1" color="gray">
-                    {formatTime(a.occurred_at)}
+            {(activity ?? []).map((a) => {
+              const target = activityTarget(a);
+              const onClick = target ? () => push(target) : undefined;
+              return (
+                <Box
+                  key={a.event_id}
+                  className={
+                    "border-b border-slate-800 pb-2" +
+                    (onClick ? " cursor-pointer hover:bg-slate-800/50 -mx-2 px-2 rounded" : "")
+                  }
+                  onClick={onClick}
+                >
+                  <Flex gap="2" align="center">
+                    <Badge color={badgeColor(a.event_type)} size="1">
+                      {a.event_type}
+                    </Badge>
+                    <Text size="1" color="gray">
+                      {formatTime(a.occurred_at)}
+                    </Text>
+                  </Flex>
+                  <Text size="2" className="break-words">
+                    <Linkified text={summarise(a)} />
                   </Text>
-                </Flex>
-                <Text size="2" className="break-words">
-                  {summarise(a)}
-                </Text>
-              </Box>
-            ))}
+                </Box>
+              );
+            })}
           </Flex>
         )}
       </Box>
     </Flex>
   );
+}
+
+/** Pop-up legend for the pod-node colour code. Renders fixed inside
+ * the graph viewport so the user can decode the colours without
+ * leaving the Glance tab. (kanban #39) */
+function NodeLegend() {
+  return (
+    <Box
+      className="absolute right-3 bottom-3 z-10 rounded-md bg-slate-900/95 border border-slate-700 px-3 py-2 text-xs"
+    >
+      <Text size="1" weight="bold" as="div" className="mb-1">
+        legend
+      </Text>
+      <Flex direction="column" gap="1">
+        <Flex align="center" gap="2">
+          <span style={legendSwatch("#22c55e")} /> running
+        </Flex>
+        <Flex align="center" gap="2">
+          <span style={legendSwatch("#ef4444")} /> stopped
+        </Flex>
+        <Flex align="center" gap="2">
+          <span style={legendSwatch("#f59e0b")} /> stuck (block-detector)
+        </Flex>
+        <Separator size="2" my="1" />
+        <Flex align="center" gap="2">
+          <span style={legendDot("yellow")} /> thinking
+        </Flex>
+        <Flex align="center" gap="2">
+          <span style={legendDot("green")} /> idle
+        </Flex>
+      </Flex>
+    </Box>
+  );
+}
+
+function legendSwatch(color: string): React.CSSProperties {
+  return {
+    display: "inline-block",
+    width: 10,
+    height: 10,
+    border: `2px solid ${color}`,
+    borderRadius: 3,
+  };
+}
+
+function legendDot(color: string): React.CSSProperties {
+  return {
+    display: "inline-block",
+    width: 8,
+    height: 8,
+    background: color === "yellow" ? "#fbbf24" : color === "green" ? "#22c55e" : "#94a3b8",
+    borderRadius: 999,
+  };
+}
+
+/** Derive the entity the user wants to peek when they click an
+ * activity-feed row. Each event_type maps to its primary target. */
+function activityTarget(a: ActivityRow): EntityRef | null {
+  try {
+    const p = JSON.parse(a.payload);
+    switch (a.event_type) {
+      case "ProclamationIssued":
+      case "ProclamationCompleted":
+        return p.proclamation_seq != null
+          ? { kind: "proclamation", id: String(p.proclamation_seq) }
+          : null;
+      case "ProposalOpened":
+      case "ProposalClosed":
+      case "BallotCast":
+        return p.proposal_id ? { kind: "proposal", id: p.proposal_id } : null;
+      case "CouncilOpened":
+      case "CouncilClosed":
+      case "MessagePosted":
+        return p.council_id ? { kind: "council", id: p.council_id } : null;
+      case "DecisionSealed":
+        return p.decision_id ? { kind: "decision", id: p.decision_id } : null;
+      case "PodContainerStarted":
+      case "PodAdmitted":
+      case "PodRenamed":
+      case "PodExited":
+      case "PodImageSwapped":
+      case "PodMarkedStuck":
+      case "AgentBooted":
+      case "AgentSessionStarted":
+      case "PodCharterLoaded":
+        return p.pod_id ? { kind: "pod", id: p.pod_id } : null;
+      default:
+        return null;
+    }
+  } catch {
+    return null;
+  }
 }
 
 function EmptyGlance() {

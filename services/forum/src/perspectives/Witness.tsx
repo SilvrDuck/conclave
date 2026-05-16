@@ -12,17 +12,25 @@ import { Markdown } from "../components/Markdown";
 import { Linkified } from "../components/Linkified";
 import { Phylactery } from "../components/Phylactery";
 import { EntityLink } from "../components/EntityLink";
+import { Glossary } from "../components/Glossary";
 
 /** Witness: epoch cards grouped by proclamation. Each proclamation
  * is a chapter; everything emitted while it was the current top of
  * the operator's pile belongs to its epoch. Older proclamations are
  * older chapters. Items issued before any proclamation land in a
  * "Background activity" bucket. */
+type Digest = {
+  hour_bucket: string;
+  summary: string;
+  item_count: number;
+};
+
 export function Witness({ onPodClick: _ }: { onPodClick: (pod_id: string) => void }) {
   const { data: procs } = useSWR<Proclamation[]>("/state/proclamations", fetcher);
   const { data: props } = useSWR<Proposal[]>("/state/proposals", fetcher);
   const { data: counc } = useSWR<Council[]>("/state/councils", fetcher);
   const { data: decs } = useSWR<Decision[]>("/state/decisions", fetcher);
+  const { data: digests } = useSWR<Digest[]>("/state/digests?limit=12", fetcher);
 
   if (!procs || !props || !counc || !decs) {
     return <Text className="p-6" color="gray">loading…</Text>;
@@ -61,6 +69,9 @@ export function Witness({ onPodClick: _ }: { onPodClick: (pod_id: string) => voi
 
   return (
     <Flex direction="column" gap="6" className="p-6 max-w-5xl mx-auto">
+      {digests && digests.length > 0 ? (
+        <DigestsPanel digests={digests} />
+      ) : null}
       {epochs.map((e, idx) => {
         const epochProps = itemsForEpoch(props, e.opened, e.nextOpened);
         const epochCounc = itemsForEpoch(counc, e.opened, e.nextOpened);
@@ -164,7 +175,9 @@ function DecisionRow({ d }: { d: Decision }) {
         <Text size="2" weight="bold">
           <EntityLink kind="decision" id={d.decision_id}>{d.title}</EntityLink>
         </Text>
-        <Badge color={d.status === "sealed" ? "green" : "gray"}>{d.status}</Badge>
+        <Badge color={d.status === "sealed" ? "green" : "gray"}>
+          {d.status === "placeholder" ? "pending" : d.status}
+        </Badge>
       </Flex>
       {d.body ? (
         <Box className="mt-1">
@@ -190,8 +203,12 @@ function ProposalCard({ p }: { p: Proposal }) {
   return (
     <Box className="mb-2 border-l-2 pl-3" style={{ borderColor: "var(--conclave-margin)" }}>
       <Flex gap="2" align="baseline" wrap="wrap">
-        <Badge color="blue">{p.kind}</Badge>
-        <Badge color="violet">{p.strategy}</Badge>
+        <Badge color="blue">
+          <Glossary term={p.kind}>{p.kind}</Glossary>
+        </Badge>
+        <Badge color="violet">
+          <Glossary term={p.strategy}>{p.strategy}</Glossary>
+        </Badge>
         <Badge color={outcomeColor(p.outcome)}>{p.outcome}</Badge>
         <Text size="2" weight="bold">
           <EntityLink kind="proposal" id={p.proposal_id}>{p.summary}</EntityLink>
@@ -274,6 +291,27 @@ function CouncilCard({ c }: { c: Council }) {
         </>
       ) : null}
     </Box>
+  );
+}
+
+function DigestsPanel({ digests }: { digests: Digest[] }) {
+  return (
+    <Card>
+      <Heading size="3" mb="2">Hourly digests</Heading>
+      <Text size="1" color="gray" as="div" className="mb-2">
+        J3 catch-up — what the swarm did, hour by hour.
+      </Text>
+      <Flex direction="column" gap="1">
+        {digests.map((d) => (
+          <Box key={d.hour_bucket} className="border-l-2 pl-3 py-1 border-amber-700/40">
+            <Text size="1" color="gray">
+              {new Date(d.hour_bucket).toLocaleString()} · {d.item_count} events
+            </Text>
+            <Text size="2" as="div"><Linkified text={d.summary} /></Text>
+          </Box>
+        ))}
+      </Flex>
+    </Card>
   );
 }
 
