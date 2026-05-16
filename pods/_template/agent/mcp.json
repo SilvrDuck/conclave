@@ -1,0 +1,24 @@
+{
+  "mcpServers": {
+    "senate": {
+      "type": "http",
+      "url": "http://mcp-senate:8000/mcp"
+    },
+    "coms": {
+      "type": "http",
+      "url": "http://mcp-coms:8000/mcp"
+    },
+    "decisions": {
+      "type": "http",
+      "url": "http://mcp-decisions:8000/mcp"
+    },
+    "state": {
+      "type": "http",
+      "url": "http://mcp-state:8000/mcp"
+    },
+    "pods": {
+      "type": "http",
+      "url": "http://mcp-pods:8000/mcp"
+    }
+  }
+}
