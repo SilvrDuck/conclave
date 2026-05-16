@@ -297,20 +297,27 @@ function CouncilCard({ c }: { c: Council }) {
 function DigestsPanel({ digests }: { digests: Digest[] }) {
   return (
     <Card>
-      <Heading size="3" mb="2">Hourly digests</Heading>
-      <Text size="1" color="gray" as="div" className="mb-2">
-        J3 catch-up — what the swarm did, hour by hour.
-      </Text>
-      <Flex direction="column" gap="1">
-        {digests.map((d) => (
-          <Box key={d.hour_bucket} className="border-l-2 pl-3 py-1 border-amber-700/40">
-            <Text size="1" color="gray">
-              {new Date(d.hour_bucket).toLocaleString()} · {d.item_count} events
-            </Text>
-            <Text size="2" as="div"><Linkified text={d.summary} /></Text>
-          </Box>
-        ))}
-      </Flex>
+      <details>
+        <summary className="cursor-pointer outline-none">
+          <Heading size="3" as="h2" className="inline">Hourly digests</Heading>
+          <Text size="1" color="gray" className="ml-2">
+            ({digests.length} hours, click to expand)
+          </Text>
+        </summary>
+        <Text size="1" color="gray" as="div" className="mt-2 mb-2">
+          J3 catch-up — what the swarm did, hour by hour.
+        </Text>
+        <Flex direction="column" gap="1">
+          {digests.map((d) => (
+            <Box key={d.hour_bucket} className="border-l-2 pl-3 py-1 border-amber-700/40">
+              <Text size="1" color="gray">
+                {new Date(d.hour_bucket).toLocaleString()} · {d.item_count} events
+              </Text>
+              <Text size="2" as="div"><Linkified text={d.summary} /></Text>
+            </Box>
+          ))}
+        </Flex>
+      </details>
     </Card>
   );
 }

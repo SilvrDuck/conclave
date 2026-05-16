@@ -54,11 +54,23 @@ export function Glance({ onPodClick }: { onPodClick: (pod_id: string) => void })
               return (
                 <Box
                   key={a.event_id}
+                  role={onClick ? "button" : undefined}
+                  tabIndex={onClick ? 0 : undefined}
                   className={
                     "border-b border-slate-800 pb-2" +
-                    (onClick ? " cursor-pointer hover:bg-slate-800/50 -mx-2 px-2 rounded" : "")
+                    (onClick ? " cursor-pointer hover:bg-slate-800/50 -mx-2 px-2 rounded focus:outline-none focus:ring-1 focus:ring-amber-500" : "")
                   }
                   onClick={onClick}
+                  onKeyDown={
+                    onClick
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onClick();
+                          }
+                        }
+                      : undefined
+                  }
                 >
                   <Flex gap="2" align="center">
                     <Badge color={badgeColor(a.event_type)} size="1">
@@ -102,9 +114,15 @@ function NodeLegend() {
         <Flex align="center" gap="2">
           <span style={legendSwatch("#f59e0b")} /> stuck (block-detector)
         </Flex>
+        <Flex align="center" gap="2">
+          <span style={legendSwatch("#475569", 0.6)} /> not yet spawned
+        </Flex>
         <Separator size="2" my="1" />
         <Flex align="center" gap="2">
           <span style={legendDot("yellow")} /> thinking
+        </Flex>
+        <Flex align="center" gap="2">
+          <span style={legendDot("orange")} /> blocked
         </Flex>
         <Flex align="center" gap="2">
           <span style={legendDot("green")} /> idle
@@ -114,22 +132,31 @@ function NodeLegend() {
   );
 }
 
-function legendSwatch(color: string): React.CSSProperties {
+function legendSwatch(color: string, opacity = 1): React.CSSProperties {
   return {
     display: "inline-block",
     width: 10,
     height: 10,
     border: `2px solid ${color}`,
     borderRadius: 3,
+    opacity,
   };
 }
 
 function legendDot(color: string): React.CSSProperties {
+  const bg =
+    color === "yellow"
+      ? "#fbbf24"
+      : color === "green"
+        ? "#22c55e"
+        : color === "orange"
+          ? "#fb923c"
+          : "#94a3b8";
   return {
     display: "inline-block",
     width: 8,
     height: 8,
-    background: color === "yellow" ? "#fbbf24" : color === "green" ? "#22c55e" : "#94a3b8",
+    background: bg,
     borderRadius: 999,
   };
 }
@@ -151,7 +178,6 @@ function activityTarget(a: ActivityRow): EntityRef | null {
         return p.proposal_id ? { kind: "proposal", id: p.proposal_id } : null;
       case "CouncilOpened":
       case "CouncilClosed":
-      case "MessagePosted":
         return p.council_id ? { kind: "council", id: p.council_id } : null;
       case "DecisionSealed":
         return p.decision_id ? { kind: "decision", id: p.decision_id } : null;

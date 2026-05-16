@@ -16,11 +16,17 @@ const TERMS: Record<string, string> = {
   decision:
     "A sealed ADR. Immutable once sealed. Origin: a proposal, a council, or a proclamation.",
   charter:
-    "A pod's role definition. Augustus and the agent can both edit it. The platform's iusiurandum (cross-pod rules) is prepended automatically.",
+    "A pod's role definition. Augustus and the agent can both edit it. The platform's cross-pod rules (the preamble) are prepended automatically.",
   admission:
     "The vote that welcomes a new pod into the swarm. N=1 admissions auto-pass via the proposer's self-vote.",
   exile:
     "The vote that removes a pod. Requires supermajority by default. Containers go away; identity is retained for audit.",
+  contract_change:
+    "A vote on changing a pod's HTTP contract (endpoints / payload shape). Affected callers vote because their code will need to follow.",
+  image_swap:
+    "A vote on replacing a pod's main image while keeping its identity. Used to upgrade adopted OSS pods (e.g. postgres:16 → postgres:17).",
+  completion:
+    "A vote that the swarm believes a proclamation has been satisfied. Seals a decision that closes the proclamation.",
   consensus_omnium:
     "A vote passes only if every eligible voter says yes. Highest bar; used for admissions and identity changes.",
   supermajority:
@@ -30,8 +36,8 @@ const TERMS: Record<string, string> = {
   sortition:
     "A subset of eligible voters is drawn at random; the draw is shown in the UI. Used when the full senate would be overkill.",
   pod: "One agent + one service it manages, end-to-end. Code-pod (agent writes the code) or adopted-pod (agent manages an OSS image).",
-  iusiurandum:
-    "The platform-priorities preamble appended to every pod's system prompt. Spec/03 row 132.",
+  preamble:
+    "The platform-priorities text prepended to every pod's system prompt (spec/03 row 132). Defines the rules every agent operates under regardless of charter.",
 };
 
 type Props = {
