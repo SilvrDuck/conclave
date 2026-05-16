@@ -30,6 +30,10 @@ from pathlib import Path
 import nats
 from fastmcp.client import Client
 from nats.js import JetStreamContext
+from opentelemetry import trace as otel_trace
+from opentelemetry.trace import Status, StatusCode
+
+_tracer = otel_trace.get_tracer("conclave.pod.agent")
 
 log = logging.getLogger("pod.bootstrap")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -228,9 +232,12 @@ def _compose_system_prompt() -> Path:
 
 
 async def _run_claude(pod_id: str, prompt: str) -> None:
-    """Spawn one `claude -p` turn. Emits AgentTurnStarted before launch
-    and AgentTurnEnded with usage on completion. Captures the session
-    id on first run for `--resume` on subsequent turns."""
+    """Spawn one `claude -p` turn. Wraps the subprocess in an OTel
+    span tagged with OpenLLMetry / GenAI semantic-convention
+    attributes so Tempo carries the LLM call alongside the HTTP
+    spans the auto-instrumentation already produces. Emits
+    AgentTurnStarted/Ended on the bus. Captures the session id on
+    first run for `--resume` on subsequent turns."""
     global _session_id
     system_path = _compose_system_prompt()
     cmd = [
@@ -254,6 +261,22 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
     log.info("agent turn %s starting (session=%s)", turn_id, _session_id or "new")
     await _publish_event(
         "AgentTurnStarted", {"pod_id": pod_id, "turn_id": turn_id}
+    )
+
+    # OpenLLMetry / GenAI semantic conventions (spec/07 c4 §Container
+    # view). One span per turn. Tempo links the turn to the HTTP spans
+    # the workspace generates because both share the same trace tree
+    # via OTel context propagation.
+    span = _tracer.start_span(
+        name="claude.code.turn",
+        attributes={
+            "gen_ai.system": "claude-code",
+            "gen_ai.request.model": CLAUDE_MODEL,
+            "gen_ai.request.effort": CLAUDE_EFFORT,
+            "conclave.pod_id": pod_id,
+            "conclave.turn_id": turn_id,
+            "conclave.charter.version_hash": _charter_version_hash()[:16],
+        },
     )
 
     # Accumulators populated by the stdout pump; consumed in the
@@ -316,15 +339,27 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
             log.warning("agent[%s] err: %s", turn_id, line.decode(errors='replace').rstrip()[:240])
 
     try:
-        await asyncio.wait_for(
-            asyncio.gather(pump_stdout(), pump_stderr(), proc.wait()),
-            timeout=AGENT_TURN_TIMEOUT_S,
-        )
-    except TimeoutError:
-        log.error("agent turn %s timed out after %ss; killing", turn_id, AGENT_TURN_TIMEOUT_S)
-        proc.kill()
-        await proc.wait()
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(pump_stdout(), pump_stderr(), proc.wait()),
+                timeout=AGENT_TURN_TIMEOUT_S,
+            )
+        except TimeoutError:
+            log.error("agent turn %s timed out after %ss; killing", turn_id, AGENT_TURN_TIMEOUT_S)
+            proc.kill()
+            await proc.wait()
+            span.set_status(Status(StatusCode.ERROR, "timeout"))
+        if proc.returncode and proc.returncode != 0:
+            span.set_status(Status(StatusCode.ERROR, f"rc={proc.returncode}"))
+        # Tag the span with the usage we parsed from the result frame
+        # so Tempo's view of the turn carries token counts (J4 link
+        # from the Forum drawer to the trace).
+        span.set_attribute("gen_ai.usage.input_tokens", usage["tokens_in"])
+        span.set_attribute("gen_ai.usage.output_tokens", usage["tokens_out"])
+        if _session_id:
+            span.set_attribute("gen_ai.response.id", _session_id)
     finally:
+        span.end()
         # Reclaim the per-turn system prompt file; the subprocess has
         # finished reading it.
         try:
