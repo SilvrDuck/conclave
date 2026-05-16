@@ -222,6 +222,28 @@ class PodHealthChanged(DomainEvent):
 # ─── Agent Execution context (observed) ────────────────────────────────────
 
 
+class AgentBooted(DomainEvent):
+    """Emitted once when a pod's agent runtime is alive and connected to
+    the bus. Distinct from PodContainerStarted (the container exists)
+    and AgentSessionStarted (Claude session id is captured). Spec/02
+    Phase 2."""
+
+    event_type: Literal["AgentBooted"] = "AgentBooted"
+    pod_id: str
+    agent_kind: str = "claude-code"
+
+
+class PodCharterLoaded(DomainEvent):
+    """Emitted by the pod when it has read its charter file at boot.
+    The hash identifies the charter content so the Forum can show
+    'charter v3' style versioning. Spec/02 Phase 2."""
+
+    event_type: Literal["PodCharterLoaded"] = "PodCharterLoaded"
+    pod_id: str
+    charter_path: str
+    version_hash: str
+
+
 class AgentSessionStarted(DomainEvent):
     event_type: Literal["AgentSessionStarted"] = "AgentSessionStarted"
     pod_id: str

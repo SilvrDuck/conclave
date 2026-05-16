@@ -10,6 +10,8 @@ from conclave_core.bus import (
 )
 from conclave_core.db import database_url, pool
 from conclave_core.events import (
+    AgentBooted,
+    AgentSessionStarted,
     AgentTurnEnded,
     AgentTurnStarted,
     BallotCast,
@@ -24,6 +26,7 @@ from conclave_core.events import (
     EndpointObserved,
     MessagePosted,
     PodAdmitted,
+    PodCharterLoaded,
     PodContainerStarted,
     PodExited,
     PodImageSwapped,
@@ -43,6 +46,8 @@ from conclave_core.models import (
 )
 
 __all__ = [
+    "AgentBooted",
+    "AgentSessionStarted",
     "AgentTurnEnded",
     "AgentTurnStarted",
     "BallotCast",
@@ -59,6 +64,7 @@ __all__ = [
     "ImageStrategy",
     "MessagePosted",
     "PodAdmitted",
+    "PodCharterLoaded",
     "PodContainerStarted",
     "PodExited",
     "PodId",

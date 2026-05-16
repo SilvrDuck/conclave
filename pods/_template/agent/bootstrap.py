@@ -16,16 +16,19 @@ needed — the subprocess uses the host's existing subscription.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
 import secrets
 import signal
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 import nats
 from fastmcp.client import Client
+from nats.js import JetStreamContext
 
 log = logging.getLogger("pod.bootstrap")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -78,6 +81,27 @@ SERVICE_ARGV = (
 
 _current_proc: asyncio.subprocess.Process | None = None
 _session_id: str | None = None  # Claude Code session for --resume
+_js: JetStreamContext | None = None  # JetStream for emitting AgentTurn* events
+
+
+async def _publish_event(event_type: str, payload: dict) -> None:
+    """Publish a domain event to JetStream. The pod doesn't import
+    conclave_core (avoiding the dependency cycle), so we hand-format
+    the envelope; observer routes on `event_type` from the payload."""
+    if _js is None:
+        log.warning("JetStream not initialised; dropping %s", event_type)
+        return
+    body = {
+        "event_id": secrets.token_hex(8),
+        "occurred_at": datetime.now(timezone.utc).isoformat(),
+        "event_type": event_type,
+        **payload,
+    }
+    subject = f"conclave.events.agent.{event_type}"
+    try:
+        await _js.publish(subject, json.dumps(body).encode())
+    except Exception:
+        log.exception("failed to publish %s", event_type)
 
 
 # ── register + service supervisor ─────────────────────────────────────
@@ -153,8 +177,9 @@ def _build_prompt(pod_id: str, display_role: str, event_kind: str, event: dict) 
 
 
 async def _run_claude(pod_id: str, prompt: str) -> None:
-    """Spawn one `claude -p` turn. Captures the session id on first run
-    for resumability on subsequent ones. Streams stdout into the pod log."""
+    """Spawn one `claude -p` turn. Emits AgentTurnStarted before launch
+    and AgentTurnEnded with usage on completion. Captures the session
+    id on first run for `--resume` on subsequent turns."""
     global _session_id
     cmd = [
         CLAUDE_BIN,
@@ -175,6 +200,13 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
 
     turn_id = secrets.token_hex(6)
     log.info("agent turn %s starting (session=%s)", turn_id, _session_id or "new")
+    await _publish_event(
+        "AgentTurnStarted", {"pod_id": pod_id, "turn_id": turn_id}
+    )
+
+    # Accumulators populated by the stdout pump; consumed in the
+    # AgentTurnEnded emission below.
+    usage: dict[str, int] = {"tokens_in": 0, "tokens_out": 0}
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -193,17 +225,37 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
             # stream-json format: each line is one JSON event.
             try:
                 ev = json.loads(txt)
-                # session id appears in the "system"/"init" frame
-                if not _session_id and isinstance(ev, dict):
-                    sid = ev.get("session_id") or ev.get("session", {}).get("id")
-                    if sid:
-                        _session_id = sid
-                        log.info("agent turn %s captured session=%s", turn_id, sid)
-                # Forward visible content tersely.
-                kind = ev.get("type") if isinstance(ev, dict) else "?"
-                if kind in {"assistant", "result"}:
-                    log.info("agent[%s]: %s", turn_id, txt[:240])
             except json.JSONDecodeError:
+                log.info("agent[%s]: %s", turn_id, txt[:240])
+                continue
+            if not isinstance(ev, dict):
+                continue
+            # session id appears in the "system"/"init" frame.
+            if not _session_id:
+                sid = ev.get("session_id") or ev.get("session", {}).get("id")
+                if sid:
+                    _session_id = sid
+                    log.info("agent turn %s captured session=%s", turn_id, sid)
+                    await _publish_event(
+                        "AgentSessionStarted",
+                        {"pod_id": pod_id, "session_id": sid},
+                    )
+            # Final "result" frame carries cumulative usage for the turn.
+            # Claude Code's stream-json result.usage carries four
+            # token counts; sum them all into tokens_in so cache
+            # reads / creation aren't silently dropped (they often
+            # dominate at haiku/low effort and are essential for J3's
+            # budget meter).
+            if ev.get("type") == "result":
+                u = ev.get("usage") or {}
+                usage["tokens_in"] = (
+                    int(u.get("input_tokens") or 0)
+                    + int(u.get("cache_creation_input_tokens") or 0)
+                    + int(u.get("cache_read_input_tokens") or 0)
+                )
+                usage["tokens_out"] = int(u.get("output_tokens") or 0)
+            kind = ev.get("type")
+            if kind in {"assistant", "result"}:
                 log.info("agent[%s]: %s", turn_id, txt[:240])
 
     async def pump_stderr() -> None:
@@ -220,13 +272,50 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
         log.error("agent turn %s timed out after %ss; killing", turn_id, AGENT_TURN_TIMEOUT_S)
         proc.kill()
         await proc.wait()
-        return
     log.info("agent turn %s finished rc=%s", turn_id, proc.returncode)
+    await _publish_event(
+        "AgentTurnEnded",
+        {"pod_id": pod_id, "turn_id": turn_id, **usage},
+    )
+
+
+def _charter_version_hash() -> str:
+    """SHA-256 of the charter file contents, hex-encoded. Missing
+    charter is a fail-fast bug — render_pod_dir copies the template
+    charter at spawn, so we should always have it. Raising here
+    surfaces a real misconfiguration instead of papering it over."""
+    if not CHARTER_PATH.exists():
+        raise FileNotFoundError(
+            f"charter file missing at {CHARTER_PATH} — "
+            "pod_dir wasn't rendered from _template?"
+        )
+    return hashlib.sha256(CHARTER_PATH.read_bytes()).hexdigest()
 
 
 async def agent_loop(pod_id: str, display_role: str) -> None:
     """Initial wake + per-event turns."""
+    global _js
     log.info("agent loop active (Claude Code; model=%s effort=%s)", CLAUDE_MODEL, CLAUDE_EFFORT)
+
+    # Connect to NATS / JetStream up-front so the initial turn can emit
+    # AgentTurnStarted / AgentTurnEnded.
+    nc = await nats.connect(NATS_URL)
+    _js = nc.jetstream()
+
+    # spec/02 Phase 2: signal the runtime is alive and the charter is
+    # loaded. Observer projects these into the activity ticker.
+    await _publish_event(
+        "AgentBooted", {"pod_id": pod_id, "agent_kind": "claude-code"}
+    )
+    await _publish_event(
+        "PodCharterLoaded",
+        {
+            "pod_id": pod_id,
+            "charter_path": str(CHARTER_PATH),
+            "version_hash": _charter_version_hash(),
+        },
+    )
+
     initial = (
         f"You are the agent for pod `{pod_id}` (display_role `{display_role}`).\n\n"
         f"You have just booted into a fresh container. Read your charter (already\n"
@@ -246,7 +335,6 @@ async def agent_loop(pod_id: str, display_role: str) -> None:
 
     # Then subscribe to this pod's inbox + Augustus's broadcast and run
     # one turn per event.
-    nc = await nats.connect(NATS_URL)
     subjects = [
         f"conclave.inbox.{pod_id}",
         "conclave.events.operator.ProclamationIssued",
