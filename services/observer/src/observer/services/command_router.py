@@ -1,20 +1,16 @@
 """CommandRouter — translates the 4 Forum writes into bus commands.
 
-Forum POSTs to `/commands` with `{kind, ...payload}`. The router validates
-the kind and routes via OperatorService. The router itself never writes
-to the DB; the owning context's process (or, for IssueProclamation, the
-OperatorService in the observer process) does that.
+Pydantic payloads are validated at the FastAPI edge (`api/commands.py`).
+This router only fans the validated model out via OperatorService.
 """
 
 from __future__ import annotations
 
-from typing import Any, Literal
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from observer.services.operator import OperatorService
-
-FOUR_WRITES = {"IssueProclamation", "SendDirectMessage", "EditCharter", "CastBallot"}
 
 
 class IssueProclamationPayload(BaseModel):
@@ -42,35 +38,22 @@ class CastBallotPayload(BaseModel):
     kind: Literal["CastBallot"] = "CastBallot"
     proposal_id: str
     voter: str
-    choice: str  # 'yes' | 'no' | 'abstain' — validated in senate
+    choice: Literal["yes", "no", "abstain"]
     comment: str | None = None
+
+
+ValidatedCommand = (
+    IssueProclamationPayload
+    | SendDirectMessagePayload
+    | EditCharterPayload
+    | CastBallotPayload
+)
 
 
 class CommandRouter:
     def __init__(self, *, operator: OperatorService) -> None:
         self._operator = operator
 
-    async def dispatch(self, body: dict[str, Any]) -> None:
-        kind = body.get("kind")
-        if kind not in FOUR_WRITES:
-            raise ValueError(
-                f"unsupported command kind: {kind!r}; expected one of {sorted(FOUR_WRITES)}"
-            )
-
-        match kind:
-            case "IssueProclamation":
-                validated = IssueProclamationPayload.model_validate(body)
-                payload = validated.model_dump(exclude={"kind"})
-            case "SendDirectMessage":
-                validated_dm = SendDirectMessagePayload.model_validate(body)
-                payload = validated_dm.model_dump(exclude={"kind"})
-            case "EditCharter":
-                validated_ce = EditCharterPayload.model_validate(body)
-                payload = validated_ce.model_dump(exclude={"kind"})
-            case "CastBallot":
-                validated_cb = CastBallotPayload.model_validate(body)
-                payload = validated_cb.model_dump(exclude={"kind"})
-            case _:
-                raise ValueError(f"unhandled kind: {kind}")
-
-        await self._operator.fan_out_forum_command(kind, payload)
+    async def dispatch_validated(self, body: ValidatedCommand) -> None:
+        payload = body.model_dump(exclude={"kind"})
+        await self._operator.fan_out_forum_command(body.kind, payload)

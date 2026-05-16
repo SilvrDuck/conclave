@@ -37,6 +37,9 @@ NAMED_EVENTS: set[str] = {
     "BallotCast",
 }
 
+# Events that update agent_turns (needed for BlockDetector to fire).
+AGENT_TURN_EVENTS = {"AgentTurnStarted", "AgentTurnEnded"}
+
 
 class ObservationService:
     def __init__(self, *, pool: asyncpg.Pool, broadcaster: EventBroadcaster) -> None:
@@ -143,6 +146,49 @@ class ObservationService:
                     await conn.execute(
                         "UPDATE observer.pod_state SET agent_state = 'stuck', last_seen = now() "
                         "WHERE pod_id = $1",
+                        data["pod_id"],
+                    )
+            case "AgentTurnStarted":
+                async with self._pool.acquire() as conn:
+                    await conn.execute(
+                        """INSERT INTO observer.agent_turns(pod_id, turn_id, started_at)
+                           VALUES($1, $2, $3)
+                           ON CONFLICT (pod_id, turn_id) DO NOTHING""",
+                        data["pod_id"],
+                        data["turn_id"],
+                        _parse_dt(data["occurred_at"]),
+                    )
+                    await conn.execute(
+                        """UPDATE observer.pod_state
+                              SET agent_state = 'thinking', last_seen = now()
+                            WHERE pod_id = $1""",
+                        data["pod_id"],
+                    )
+            case "AgentTurnEnded":
+                async with self._pool.acquire() as conn:
+                    await conn.execute(
+                        """INSERT INTO observer.agent_turns(pod_id, turn_id, started_at,
+                                ended_at, tokens_in, tokens_out)
+                           VALUES($1, $2,
+                                  COALESCE(
+                                    (SELECT started_at FROM observer.agent_turns
+                                       WHERE pod_id = $1 AND turn_id = $2),
+                                    $3),
+                                  $3, $4, $5)
+                           ON CONFLICT (pod_id, turn_id) DO UPDATE
+                               SET ended_at = EXCLUDED.ended_at,
+                                   tokens_in = EXCLUDED.tokens_in,
+                                   tokens_out = EXCLUDED.tokens_out""",
+                        data["pod_id"],
+                        data["turn_id"],
+                        _parse_dt(data["occurred_at"]),
+                        data.get("tokens_in") or 0,
+                        data.get("tokens_out") or 0,
+                    )
+                    await conn.execute(
+                        """UPDATE observer.pod_state
+                              SET agent_state = 'idle', last_seen = now()
+                            WHERE pod_id = $1 AND agent_state = 'thinking'""",
                         data["pod_id"],
                     )
 
