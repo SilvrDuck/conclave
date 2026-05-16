@@ -67,15 +67,30 @@ class ComsService:
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 row = await conn.fetchrow(
-                    "SELECT participants, status FROM council.councils "
-                    "WHERE council_id = $1 FOR UPDATE",
+                    """SELECT participants, status, private
+                         FROM council.councils
+                         WHERE council_id = $1 FOR UPDATE""",
                     council_id,
                 )
                 if row is None:
                     raise ValueError(f"unknown council_id: {council_id}")
                 if row["status"] != "open":
                     raise ValueError(f"council {council_id} is closed")
-                if from_pod != AUGUSTUS and from_pod not in row["participants"]:
+
+                participants = list(row["participants"])
+                if from_pod == AUGUSTUS:
+                    # Spec §C3: Augustus posts only in private 2-party councils
+                    # he's a participant of (DMs). Public councils are read-only
+                    # for him.
+                    if not (
+                        row["private"]
+                        and len(participants) == 2
+                        and AUGUSTUS in participants
+                    ):
+                        raise ValueError(
+                            f"Augustus may only post in DMs; {council_id} is not one"
+                        )
+                elif from_pod not in participants:
                     raise ValueError(
                         f"{from_pod} is not a participant in {council_id}"
                     )
@@ -126,28 +141,80 @@ class ComsService:
     async def dm(self, *, from_pod: str, to_pod: str, body: str) -> dict[str, Any]:
         """Open-or-reuse a 2-party private council and post one message.
 
-        DMs are the degenerate case of councils. Reusing the existing one
-        avoids spawning N DM threads between the same two parties.
+        DMs are the degenerate case of councils. The find-or-create lookup
+        runs under an advisory lock keyed on the sorted pair, so two
+        concurrent DMs between the same parties don't fork the thread.
         """
+        if from_pod == to_pod:
+            raise ValueError("cannot DM yourself")
         a, b = sorted([from_pod, to_pod])
+        pair_key = f"{a}|{b}"
         async with self._pool.acquire() as conn:
-            row = await conn.fetchrow(
-                """SELECT council_id FROM council.councils
-                     WHERE private = TRUE AND status = 'open'
-                       AND participants @> ARRAY[$1, $2]::text[]
-                       AND array_length(participants, 1) = 2
-                     LIMIT 1""",
-                a,
-                b,
-            )
-        if row is None:
-            council_id = await self.convene_council(
-                topic=f"DM: {a} ↔ {b}",
-                participants=[a, b],
-                private=True,
-                needs_augustus=(AUGUSTUS in {a, b} and to_pod != AUGUSTUS),
-            )
-        else:
-            council_id = row["council_id"]
-        seq = await self.post_message(council_id=council_id, from_pod=from_pod, body=body)
+            async with conn.transaction():
+                # Advisory lock on the sorted-pair hash serialises concurrent
+                # dm() calls for the same parties so we don't create duplicate
+                # threads. Lock is auto-released at txn end.
+                await conn.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    pair_key,
+                )
+                row = await conn.fetchrow(
+                    """SELECT council_id FROM council.councils
+                         WHERE private = TRUE AND status = 'open'
+                           AND participants @> ARRAY[$1, $2]::text[]
+                           AND array_length(participants, 1) = 2
+                         LIMIT 1""",
+                    a,
+                    b,
+                )
+                if row is None:
+                    council_id = await self._insert_council(
+                        conn=conn,
+                        topic=f"DM: {a} ↔ {b}",
+                        participants=[a, b],
+                        private=True,
+                        # Spec §C5: a fresh DM where Augustus is a party should
+                        # surface on the operator inbox (regardless of direction).
+                        needs_augustus=AUGUSTUS in {a, b},
+                    )
+                else:
+                    council_id = row["council_id"]
+        seq = await self.post_message(
+            council_id=council_id, from_pod=from_pod, body=body
+        )
         return {"council_id": council_id, "seq": seq}
+
+    async def _insert_council(
+        self,
+        *,
+        conn: asyncpg.Connection,
+        topic: str,
+        participants: list[str],
+        private: bool,
+        needs_augustus: bool,
+    ) -> str:
+        """Insert a council row + publish CouncilOpened. Used inside an
+        existing txn so the surrounding logic can hold its lock."""
+        council_id = f"council-{secrets.token_hex(6)}"
+        await conn.execute(
+            """INSERT INTO council.councils(council_id, topic, participants,
+                   private, needs_augustus)
+               VALUES($1, $2, $3, $4, $5)""",
+            council_id,
+            topic,
+            participants,
+            private,
+            needs_augustus,
+        )
+        await self._bus.publish_event(
+            CouncilOpened(
+                council_id=council_id,
+                topic=topic,
+                participants=participants,
+                private=private,
+                needs_augustus=needs_augustus,
+            ),
+            COUNCIL_CONTEXT,
+        )
+        log.info("CouncilOpened %s topic=%r participants=%d", council_id, topic, len(participants))
+        return council_id
