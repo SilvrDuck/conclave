@@ -33,4 +33,6 @@ infra/data/
 *.log
 *.tsbuildinfo
 services/forum/dist/
-services/forum/src/*.js
+services/forum/src/**/*.js
+services/forum/vite.config.js
+tests/screenshots/
