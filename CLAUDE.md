@@ -2,11 +2,22 @@
 
 ## Development workflow
 
-- **PRs land on the current version branch (e.g. `vN`), not `main`.** Check which branch is the active target before opening a PR; do not push to `main` directly.
-- **Short-lived feature branches.** One logical unit per branch (one service, one feature). Merge often — keep branches small enough to review in one pass.
-- **Always go through PRs on GitHub.** `gh pr create --base <version-branch>`. Reference the kanban task in the PR body (e.g. `Closes kanban/tasks/005-observer-…md`).
-- **Get a code-review agent to review before merge.** Spawn a review agent after pushing; address the feedback; then merge.
-- **Backlog and triage as you go.** When you discover new work, add it to kanban-md as a task. Re-prioritise existing tasks as needed.
+**Hard rules — never violate these:**
+
+- **Never push directly to `main` or to the version branch** (e.g. `v2`). Every change reaches the version branch through a PR merged via `gh pr merge`.
+- **Always work on a short-lived feature branch.** One logical unit per branch (one service, one feature). Branch off the version branch, not `main`.
+- **Every PR has a code-review agent pass before merge.** Spawn the review with `run_in_background: true` so you keep working; address its feedback in the same PR before merging.
+
+**Standard loop:**
+
+1. `git checkout <version-branch> && git pull` then `git checkout -b feat/<scope>`.
+2. Implement one logical unit. Commit incrementally.
+3. `git push -u origin feat/<scope>`.
+4. `gh pr create --base <version-branch>` with a kanban task ref in the body (e.g. `Closes kanban/tasks/005-observer-…md`).
+5. Spawn a code-review agent (background). Address feedback, push fixes.
+6. `gh pr merge <#> --merge`. Move the kanban task to `done`. Start the next branch.
+
+**Backlog hygiene:** add new work to kanban-md as it surfaces; re-prioritise existing tasks. When scope grows, file a new task rather than widening an in-flight one.
 
 ## Kanban (kanban-md)
 
