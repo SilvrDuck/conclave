@@ -6,6 +6,7 @@ import { usePeek, type EntityRef } from "./PeekContext";
 import { Markdown } from "./Markdown";
 import { EntityLink } from "./EntityLink";
 import { Linkified } from "./Linkified";
+import { Phylactery } from "./Phylactery";
 
 const OBSERVER_URL =
   (import.meta.env?.VITE_OBSERVER_URL as string | undefined) ??
@@ -201,10 +202,12 @@ function CouncilPeek({ councilId }: { councilId: string }) {
       </Text>
       <Flex direction="column" gap="2" className="mt-2">
         {msgs?.map((m: any) => (
-          <div key={m.seq} className="phylactery">
-            <div className="sender">{m.from_pod}</div>
-            <Linkified text={m.body} />
-          </div>
+          <Phylactery
+            key={m.seq}
+            sender={m.from_pod}
+            body={m.body}
+            sentAt={m.sent_at}
+          />
         ))}
       </Flex>
     </Flex>

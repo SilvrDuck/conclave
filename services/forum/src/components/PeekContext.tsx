@@ -36,12 +36,23 @@ type PeekContextValue = {
 
 const PeekContext = createContext<PeekContextValue | null>(null);
 
+const MAX_STACK_DEPTH = 16;
+
 export function PeekProvider({ children }: { children: ReactNode }) {
   const [stack, setStack] = useState<EntityRef[]>([]);
-  const push = useCallback(
-    (ref: EntityRef) => setStack((s) => [...s, ref]),
-    [],
-  );
+  const push = useCallback((ref: EntityRef) => {
+    setStack((s) => {
+      // Dedup: if the topmost peek already shows this entity, no-op.
+      const top = s[s.length - 1];
+      if (top && top.kind === ref.kind && top.id === ref.id) return s;
+      // Bound depth: if the user navigates in a cycle, drop the
+      // oldest entry so we don't grow unboundedly.
+      const next = [...s, ref];
+      return next.length > MAX_STACK_DEPTH
+        ? next.slice(next.length - MAX_STACK_DEPTH)
+        : next;
+    });
+  }, []);
   const pop = useCallback(() => setStack((s) => s.slice(0, -1)), []);
   const clear = useCallback(() => setStack([]), []);
   return (

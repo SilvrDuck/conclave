@@ -1,7 +1,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { Cross1Icon } from "@radix-ui/react-icons";
 import { Box, Flex, IconButton, Text } from "@radix-ui/themes";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import { Markdown } from "./Markdown";
 
@@ -92,6 +92,21 @@ export function AboutDialog() {
 export function SpecDialog() {
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState<string>("00-vision.md");
+  // Listen for the cross-component event Linkified fires when a
+  // user clicks `spec/00-vision.md` in authored text. Centralising
+  // the spec viewer here means Linkified doesn't need to thread
+  // open-state through the component tree.
+  useEffect(() => {
+    const onOpenSpec = (e: Event) => {
+      const fname = (e as CustomEvent).detail;
+      if (typeof fname === "string") {
+        setSelected(fname);
+        setOpen(true);
+      }
+    };
+    window.addEventListener("conclave:open-spec", onOpenSpec);
+    return () => window.removeEventListener("conclave:open-spec", onOpenSpec);
+  }, []);
   const { data } = useSWR<SpecPage | { detail: string }>(
     open ? `${OBSERVER_URL}/state/spec/${selected}` : null,
     fetcher,
