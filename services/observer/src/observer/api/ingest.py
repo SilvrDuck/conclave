@@ -28,9 +28,11 @@ async def ingest_otel(request: Request, body: dict[str, Any]) -> dict[str, int]:
     if not calls and not endpoints:
         return {"calls": 0, "endpoints": 0}
 
+    seen_pods: set[str] = set()
     async with pool.acquire() as conn:
         async with conn.transaction():
             for ep in endpoints:
+                seen_pods.add(ep.pod_id)
                 await conn.execute(
                     """INSERT INTO observer.endpoints(pod_id, method, path)
                        VALUES($1, $2, $3)
@@ -41,6 +43,8 @@ async def ingest_otel(request: Request, body: dict[str, Any]) -> dict[str, int]:
                     ep.path,
                 )
             for c in calls:
+                seen_pods.add(c.src_pod)
+                seen_pods.add(c.dst_pod)
                 await conn.execute(
                     """INSERT INTO observer.calls(src_pod, dst_pod, method, path,
                             status, latency_ms, observed_at)
@@ -52,5 +56,20 @@ async def ingest_otel(request: Request, body: dict[str, Any]) -> dict[str, int]:
                     c.status,
                     c.latency_ms,
                     c.observed_at,
+                )
+            # Refresh pod_state.last_seen for every pod that emitted a span.
+            # Without this, the HealthWatcher's staleness scan would flip every
+            # pod 'stopped' while it's actively serving traffic. Also flip a
+            # 'stopped' pod back to 'running' on activity returning.
+            for pod_id in seen_pods:
+                await conn.execute(
+                    """UPDATE observer.pod_state
+                          SET last_seen = now(),
+                              runtime_status = CASE
+                                  WHEN runtime_status = 'stopped' THEN 'running'
+                                  ELSE runtime_status
+                              END
+                        WHERE pod_id = $1""",
+                    pod_id,
                 )
     return {"calls": len(calls), "endpoints": len(endpoints)}
