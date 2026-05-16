@@ -15,6 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from observer.api import commands, inbox, ingest, stream
 from observer.api import state as state_api
 from observer.config import Config
+from observer.reactors.annotation import AnnotationRequester
 from observer.reactors.block import BlockDetector
 from observer.reactors.digester import ActivityDigester
 from observer.reactors.health import HealthWatcher
@@ -60,6 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             HealthWatcher(pool=pool, bus=bus),
             BlockDetector(pool=pool, bus=bus),
             ActivityDigester(pool=pool),
+            AnnotationRequester(pool=pool, bus=bus),
         ]
         for r in reactors:
             await r.start()
