@@ -1,5 +1,11 @@
 # Template snippet — copy into infra/compose.yaml and rename the keys.
-# Replace ${ROLE} and ${IMAGE}; pick a distinct host port if exposing.
+#
+# Replace `${ROLE}` and `${IMAGE}` *textually*. Docker Compose only
+# substitutes env vars inside service-key values; it does NOT substitute
+# service names or `container_name`. So `${ROLE}:` and
+# `container_name: pod-${ROLE}` need a real edit, not a runtime env.
+#
+# Pick a distinct host port if exposing.
 
 x-adopted-pod-template: &adopted-pod-template
   profiles: ["pod-${ROLE}"]
