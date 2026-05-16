@@ -35,6 +35,13 @@ ensure_host_entry forum.conclave.local
 ensure_host_entry api.conclave.local
 
 # ── 3. bring stack up ───────────────────────────────────────────────────
+# Plumb host paths into mcp-pods so it can bind-mount Claude creds + the
+# project dir into the pods it spawns. Compose interpolates ${VAR} from
+# the caller's environment, so we export here.
+export HOST_PROJECT_DIR="${REPO_ROOT}"
+export HOST_CLAUDE_CREDENTIALS="${HOME}/.claude/.credentials.json"
+export HOST_CLAUDE_VERSIONS="${HOME}/.local/share/claude/versions"
+
 blue "starting conclave platform (this may take a minute on first build)"
 docker compose -f "${COMPOSE_FILE}" --profile conclave up -d --build
 
