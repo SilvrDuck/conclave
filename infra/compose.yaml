@@ -39,8 +39,8 @@ services:
       - "--api.dashboard=true"
       - "--api.insecure=true"
     ports:
-      - "80:80"
-      - "8088:8080"  # traefik dashboard
+      - "9080:80"      # web entrypoint (host :9080 avoids dev-host port 80 clash)
+      - "8088:8080"    # traefik dashboard
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
@@ -68,7 +68,7 @@ services:
       retries: 10
 
   nats:
-    image: nats:2.10-alpine
+    image: nats:2.11-alpine
     profiles: ["conclave"]
     restart: unless-stopped
     networks: [conclave]

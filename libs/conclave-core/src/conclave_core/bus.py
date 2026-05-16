@@ -22,7 +22,7 @@ from typing import Any
 
 from nats.aio.client import Client as NATSClient
 from nats.js import JetStreamContext
-from nats.js.api import RetentionPolicy, StreamConfig
+from nats.js.api import RetentionPolicy
 from nats.js.errors import BadRequestError
 
 from conclave_core.events import DomainEvent
@@ -99,19 +99,27 @@ class Bus:
         Anything other than the well-known "already exists" path propagates —
         a connection / auth / quota error must fail loudly, not be hidden.
         """
-        cfg = StreamConfig(
-            name=name,
-            subjects=subjects,
-            retention=retention,
-            max_age=7 * 24 * 3600 * 10**9,  # 7 days in ns
-        )
+        # nats-py's StreamConfig serialises every field including unset ones
+        # as JSON `null`, which JetStream rejects with err_code=10025. Pass
+        # only the fields we actually want set; let JetStream pick defaults
+        # for the rest.
         try:
-            await self._js.add_stream(cfg)
+            await self._js.add_stream(
+                name=name,
+                subjects=subjects,
+                retention=retention,
+                max_age=7 * 24 * 3600,  # 7 days (nats-py expects seconds, multiplies by 10^9 itself)  # 7 days (nats-py expects seconds)
+            )
         except BadRequestError as e:
             # JetStream returns 10058 / "stream name already in use" when a
             # stream with this name already exists. Reconfigure in place.
             if e.err_code == 10058 or "already in use" in str(e).lower():
-                await self._js.update_stream(cfg)
+                await self._js.update_stream(
+                    name=name,
+                    subjects=subjects,
+                    retention=retention,
+                    max_age=7 * 24 * 3600 * 10**9,
+                )
             else:
                 raise
 

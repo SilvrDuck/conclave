@@ -1,2 +1,7 @@
 packages:
   - "services/forum"
+
+# pnpm 10+ refuses to silently ignore build scripts.
+# Whitelist the packages that genuinely need theirs to run.
+allowBuilds:
+  esbuild: true
