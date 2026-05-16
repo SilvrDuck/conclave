@@ -129,11 +129,8 @@ class PodsService:
 
         # Image swap is its own path because the senate payload carries
         # the new image/mode, and we need PodImageSwapped (not PodAdmitted).
-        payload = data.get("payload") if isinstance(data, dict) else None
-        # The senate's ProposalClosed event doesn't include the payload by
-        # default. So we also subscribe to ProposalOpened (in the lifespan)
-        # to cache image_swap intents keyed by proposal_id, and look it up
-        # here. For v2 alpha we read the proposal back from the senate db.
+        # The ProposalClosed event doesn't carry the payload, so we read it
+        # back from the senate schema inside _handle_image_swap_close.
         if "Image swap" in str(data.get("summary", "")):
             await self._handle_image_swap_close(data["proposal_id"])
             return
