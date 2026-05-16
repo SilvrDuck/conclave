@@ -241,9 +241,18 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
                         {"pod_id": pod_id, "session_id": sid},
                     )
             # Final "result" frame carries cumulative usage for the turn.
+            # Claude Code's stream-json result.usage carries four
+            # token counts; sum them all into tokens_in so cache
+            # reads / creation aren't silently dropped (they often
+            # dominate at haiku/low effort and are essential for J3's
+            # budget meter).
             if ev.get("type") == "result":
                 u = ev.get("usage") or {}
-                usage["tokens_in"] = int(u.get("input_tokens") or 0)
+                usage["tokens_in"] = (
+                    int(u.get("input_tokens") or 0)
+                    + int(u.get("cache_creation_input_tokens") or 0)
+                    + int(u.get("cache_read_input_tokens") or 0)
+                )
                 usage["tokens_out"] = int(u.get("output_tokens") or 0)
             kind = ev.get("type")
             if kind in {"assistant", "result"}:
@@ -271,10 +280,15 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
 
 
 def _charter_version_hash() -> str:
-    """SHA-256 of the charter file contents, hex-encoded. Empty string
-    if the file is missing (shouldn't happen — render_pod_dir copies it)."""
+    """SHA-256 of the charter file contents, hex-encoded. Missing
+    charter is a fail-fast bug — render_pod_dir copies the template
+    charter at spawn, so we should always have it. Raising here
+    surfaces a real misconfiguration instead of papering it over."""
     if not CHARTER_PATH.exists():
-        return ""
+        raise FileNotFoundError(
+            f"charter file missing at {CHARTER_PATH} — "
+            "pod_dir wasn't rendered from _template?"
+        )
     return hashlib.sha256(CHARTER_PATH.read_bytes()).hexdigest()
 
 

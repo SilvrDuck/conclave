@@ -7,6 +7,14 @@ Subject layout
   conclave.inbox.<pod_id>                 per-pod fanout (consumers per pod)
   conclave.council.<council_id>           per-council append-only stream
 
+Valid `<context>` tags (one per bounded context in spec/05):
+  operator | senate | council | decisions | observer | pods | agent
+
+The `agent` tag is used by pod-side bootstraps to publish their
+runtime-level events (AgentBooted, AgentSessionStarted,
+AgentTurnStarted/Ended) — the platform's other publishers use the
+mcp-service-owned context for their own emissions.
+
 Streams are durable. Consumers ack explicitly. The Observer reprojects
 events into Postgres read models on first connect by replaying from a
 durable consumer cursor.

@@ -195,11 +195,17 @@ class ObservationService:
                         data["pod_id"],
                     )
             case "AgentBooted":
+                # Guard against clobbering an in-flight turn or a stuck
+                # state: AgentBooted on JetStream redelivery / replay
+                # arriving after an AgentTurnStarted would otherwise
+                # bounce 'thinking' back to 'idle'. The 'stuck' flip from
+                # BlockDetector is similarly load-bearing — preserve it.
                 async with self._pool.acquire() as conn:
                     await conn.execute(
                         """UPDATE observer.pod_state
                               SET agent_state = 'idle', last_seen = now()
-                            WHERE pod_id = $1""",
+                            WHERE pod_id = $1
+                              AND agent_state NOT IN ('thinking', 'stuck')""",
                         data["pod_id"],
                     )
 
