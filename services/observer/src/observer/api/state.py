@@ -6,12 +6,25 @@ business logic here; just selects and shape-conversions.
 
 from __future__ import annotations
 
+import os
+import re
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 router = APIRouter(prefix="/state", tags=["state"])
+
+# Filesystem reads (charter / workspace tree / spec) live behind PROJECT_DIR
+# which the compose mount bind-mounts RO from the host project root.
+_PROJECT_DIR = Path(os.environ.get("PROJECT_DIR", "/workspace"))
+# Pod ids are minted as `pod-<hex>`, but the schema accepts any TEXT.
+# We restrict to a conservative slug to defeat path traversal.
+_POD_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+_SPEC_NAME_RE = re.compile(r"^[a-zA-Z0-9_.-]+\.md$")
+# Cap workspace file listing so a runaway pod can't OOM the Forum.
+_MAX_WORKSPACE_ENTRIES = 500
 
 
 @router.get("/pods")
@@ -267,3 +280,85 @@ async def list_digests(request: Request, limit: int = 24) -> list[dict[str, Any]
         }
         for r in rows
     ]
+
+
+def _validate_pod_id(pod_id: str) -> None:
+    if not _POD_ID_RE.match(pod_id):
+        raise HTTPException(status_code=400, detail="invalid pod_id format")
+
+
+@router.get("/pods/{pod_id}/charter")
+async def get_pod_charter(pod_id: str) -> dict[str, Any]:
+    """Read the pod's charter.md from disk so the Forum charter editor
+    can pre-load it (J7) and the PodDrawer can render the rules above
+    the tabs. The charter is mounted RO into the pod and written
+    on-host; observer mirrors the host view."""
+    _validate_pod_id(pod_id)
+    charter = _PROJECT_DIR / "pods" / pod_id / "charter.md"
+    if not charter.is_file():
+        raise HTTPException(status_code=404, detail="charter not found")
+    body = charter.read_text(encoding="utf-8")
+    stat = charter.stat()
+    return {
+        "pod_id": pod_id,
+        "path": str(charter.relative_to(_PROJECT_DIR)),
+        "body": body,
+        "size": stat.st_size,
+        "mtime": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
+    }
+
+
+@router.get("/pods/{pod_id}/files")
+async def list_pod_files(pod_id: str) -> dict[str, Any]:
+    """List files in the pod's workspace/ directory. Returns a flat
+    list with relative paths so the Forum can render a file tree.
+    Caps results to keep responses bounded."""
+    _validate_pod_id(pod_id)
+    workspace = _PROJECT_DIR / "pods" / pod_id / "workspace"
+    if not workspace.is_dir():
+        raise HTTPException(status_code=404, detail="workspace not found")
+    entries: list[dict[str, Any]] = []
+    for p in sorted(workspace.rglob("*")):
+        if len(entries) >= _MAX_WORKSPACE_ENTRIES:
+            break
+        # Ignore __pycache__, .pyc, hidden files — they're noise.
+        if any(part.startswith(".") or part == "__pycache__" for part in p.relative_to(workspace).parts):
+            continue
+        if p.is_dir():
+            kind = "dir"
+            size = None
+        else:
+            kind = "file"
+            size = p.stat().st_size
+        entries.append(
+            {
+                "path": str(p.relative_to(workspace)),
+                "kind": kind,
+                "size": size,
+            }
+        )
+    return {
+        "pod_id": pod_id,
+        "root": str(workspace.relative_to(_PROJECT_DIR)),
+        "truncated": len(entries) >= _MAX_WORKSPACE_ENTRIES,
+        "entries": entries,
+    }
+
+
+@router.get("/spec/{filename}")
+async def get_spec_file(filename: str) -> dict[str, Any]:
+    """Read a spec/<filename>.md so the Forum 'Spec' link can render
+    it inline. Filenames are restricted to bare `<name>.md` (no
+    path components) to defeat traversal."""
+    if not _SPEC_NAME_RE.match(filename):
+        raise HTTPException(status_code=400, detail="invalid spec filename")
+    spec_path = _PROJECT_DIR / "spec" / filename
+    if not spec_path.is_file():
+        raise HTTPException(status_code=404, detail="spec file not found")
+    body = spec_path.read_text(encoding="utf-8")
+    return {
+        "filename": filename,
+        "path": str(spec_path.relative_to(_PROJECT_DIR)),
+        "body": body,
+        "size": spec_path.stat().st_size,
+    }

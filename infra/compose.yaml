@@ -124,11 +124,17 @@ services:
       DATABASE_URL: postgres://conclave:conclave@postgres:5432/conclave
       NATS_URL: nats://nats:4222
       TEMPO_URL: http://tempo:3200
+      PROJECT_DIR: /workspace
     depends_on:
       postgres:
         condition: service_healthy
       nats:
         condition: service_healthy
+    volumes:
+      # RO mount so the Forum can read per-pod charter / workspace
+      # files and spec/*.md via observer (GET /state/pods/{id}/charter,
+      # /state/pods/{id}/files, /state/spec/{filename}).
+      - ..:/workspace:ro
     labels:
       traefik.enable: "true"
       traefik.http.routers.observer.rule: "Host(`api.conclave.local`)"
