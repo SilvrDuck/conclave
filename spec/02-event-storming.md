@@ -37,11 +37,11 @@ of N.
 
 | | |
 |---|---|
-| 🟦 architect | runs the one-shot install |
-| 🔵 command | `bootstrap stack with defaults` |
+| 🟦 architect | runs `docker compose --profile conclave up` |
+| 🔵 command | `bootstrap stack with defaults` (no custom CLI; the compose profile *is* the command) |
 | 🟠 events | `StackProvisioned`, `BusReady`, `StoreReady`, `MeshReady`, `ProxyReady`, `ObserverReady` |
 | 🟡 read model | "platform is healthy" badge in glance perspective |
-| 🟥 hot spot | how do we make the bootstrap idempotent across re-runs without wiping the project's state? (see [03-prototype-audit](03-prototype-audit.md) — kickstart had a "wipe everything" sledgehammer) |
+| 🟥 hot spot | idempotency — a re-run of the compose profile must not wipe project state. State lives in mounted volumes; service containers are stateless. (See [03-prototype-audit](03-prototype-audit.md) L6 — v1's kickstart.sh had a "wipe everything" sledgehammer; v2 has no such script.) |
 
 Nothing here involves agents yet. The architect's plane (A) is the only
 actor.
@@ -240,14 +240,17 @@ a new one any time.
 
 ## Cross-cutting reactors
 
-These don't sit in one phase; they run continuously.
+These don't sit in one phase; they run continuously. **Each reactor
+lives in the process that owns the tables it mutates** (no cross-
+context writes — see [05-ddd-contexts](05-ddd-contexts.md) and
+[07-c4](07-c4.md)).
 
-| Reactor | Trigger | Action |
-|---------|---------|--------|
-| **Deadline closer** | proposal_id ticks past deadline | close proposal per its strategy (timeout policy) |
-| **Health watcher** | container disappears / OTel error span | mark pod `runtime: stopped` on the forum |
-| **Block detector** | pod thinking > N minutes / council silent > M minutes | surface in glance perspective's "stuck" tray |
-| **Activity digester** | hourly | summarise the activity feed into a digest row (for J3) |
+| Reactor | Trigger | Action | Lives in |
+|---------|---------|--------|----------|
+| **Deadline closer** | proposal_id ticks past deadline | emit `TickDeadline`; strategy closes the proposal per its timeout policy | **Senate** process |
+| **Health watcher** | container disappears / OTel error span | set `PodState.runtime_status = stopped` on the forum | **Observer** |
+| **Block detector** | pod thinking > N minutes / council silent > M minutes | set `PodState.agent_state = stuck`; the Augustus inbox read-model surfaces it | **Observer** |
+| **Activity digester** | hourly | summarise the activity feed into a digest row (for J3) | **Observer** |
 
 Every reactor is named, observable, and OSS-implementable (NATS
 JetStream consumers / Postgres triggers / OTel collector pipelines).

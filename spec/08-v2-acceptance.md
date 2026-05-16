@@ -126,11 +126,13 @@ This is the single criterion that most justifies v2's existence.
 - [ ] **At least one adopted pod** runs in the golden run (an OSS
       image managed by an agent sidecar with privileged access). The
       most natural candidate is `postgres:16`.
-- [ ] **At least one image-swap** demonstrated (a pod proposes and
-      passes `kind=image_swap`, the platform brings the new pod up
-      with the agent's identity preserved). Optional if a real
-      reason doesn't surface; recorded as "demonstrated"
-      vs "skipped — no reason emerged."
+- [ ] **At least one image-swap** demonstrated in the golden run:
+      a pod proposes `kind=image_swap`, the senate passes it, and
+      the platform brings the new container up with the agent's
+      identity preserved. **Required** — image-swap is the
+      load-bearing demonstration of pods self-modifying their
+      substrate; if no organic scenario surfaces during the run,
+      the run team contrives one (e.g. force `postgres:16 → postgres:17`).
 
 ---
 

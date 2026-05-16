@@ -159,7 +159,7 @@ that's harder than what it labels."
 | Activity ticker on the side | KEEP | Useful in glance perspective. Same data, lighter component. |
 | Charter editor as a textarea | CHANGE | Pre-loads current charter; shows diff before commit. |
 | Exile district as its own view | REMOVE | Folded into the per-pod drawer. Exiled pods move to a tray, don't get their own page. |
-| First-run wizard view | REMOVE | Bootstrap is zero-config (`kickstart.sh` with sane defaults). Wizard returns later if needed. |
+| First-run wizard view | REMOVE | Bootstrap is zero-config (`docker compose --profile conclave up` — see [07-c4](07-c4.md) §Deployment view). Wizard returns later if needed. |
 | Interconnection / click-through-the-graph | NEW | Required. Every entity in the UI is a clickable node that reaches its neighbours. |
 | Live token stream view in pod drawer | NEW | See J4. |
 | Council / meeting thread view | NEW | See J5. |
@@ -202,10 +202,10 @@ that's harder than what it labels."
 
 | v1 thing | Verdict | Lesson / direction for v2 |
 |---|---|---|
-| `kickstart.sh` zero-config bash | KEEP | Architect chose this for v2 (wizard deferred). |
+| `kickstart.sh` zero-config bash | REMOVE | v2 entry point is `docker compose --profile conclave up` (see L6 — Pi-as-CLI was structurally fragile; no script intermediary). |
 | CLI wizard (`conclave-wizard`) | REMOVE for v2 alpha | Brings back as a polish item in a later version. Not in the alpha scope. |
 | Frontend wizard view | REMOVE | See L8 / J-anti. The wizard has no place on a running instance. |
-| `infra/compose.yaml` as the canonical IaC | CHANGE | Stays the format, but each pod is a *profile* spun up on demand by the orchestrator service, not a static service. |
+| `infra/compose.yaml` as the canonical IaC | CHANGE | Stays the format. Platform services live behind the `conclave` profile; each pod is its own `pod-<role>` profile spun up on demand by the pods MCP-server. |
 
 ---
 

@@ -15,7 +15,7 @@ Listed in priority order. Each has at least one scenario in §2.
 | QA1 | **Watchability** | The architect's #1 retro ask. If Augustus can't see what's happening, the platform's value collapses. The deliverable IS the watchability. |
 | QA2 | **OSS-leverage** | Architect's "production-shaped, no quick-and-dirty, avoid custom stuff like hell." Custom code is a liability. |
 | QA3 | **Pluggability** | The platform's structural promise (≥2 candidates per slot). v1 mostly skipped exercising this; v2 must keep abstractions honest. |
-| QA4 | **Operability** | Augustus has to be able to bring the stack up and down, watch it, course-correct. No CLI invocations beyond `kickstart.sh`. |
+| QA4 | **Operability** | Augustus has to be able to bring the stack up and down, watch it, course-correct. No custom CLI beyond `docker compose --profile conclave up` (see [07-c4](07-c4.md) §Deployment view). |
 | QA5 | **Many-agent scale** | ~6–10 pods comfortable. Senate strategies don't exercise with N=1. |
 | QA6 | **Modifiability** | The architect needs to add a new strategy, a new pod kind, a new MCP tool without rewriting the world. |
 | QA7 | **Robustness** | Pods crash, agents hang, OSS containers fail. Stack survives, restarts gracefully, doesn't lose project state. |
@@ -67,7 +67,7 @@ when a second arrives.
 
 | ID | Scenario | Response measure |
 |---|---|---|
-| Op1 | Augustus wants to start the stack on a fresh machine. | `bash kickstart.sh` → operational stack in < 90 s post-cache. |
+| Op1 | Augustus wants to start the stack on a fresh machine. | `docker compose --profile conclave up` → operational stack in < 90 s post-cache. |
 | Op2 | Augustus wants to stop the stack. | `docker compose down` → all conclave containers stopped, project state preserved. |
 | Op3 | Augustus wants to wipe the project. | A documented two-command teardown that doesn't require deleting volumes by hand. |
 | Op4 | Augustus discovers a pod stuck. | One click "restart pod" in the UI. |

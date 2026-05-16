@@ -92,16 +92,20 @@ events / outbound commands.
 
 ### C1 — Operator
 
-The Augustus-facing context. Holds the proclamation queue, the
-operator's DMs, and the read-models for the four perspectives.
+The Augustus-facing context. Holds the proclamation queue and the
+operator's DMs. The "Augustus inbox" Augustus sees in the Forum is
+**not an aggregate here** — it's a read-model in C5 Observation that
+joins open ballots (C2), pods flagged stuck (C5), and council threads
+tagged `needs-augustus` (C3). See C5 below.
 
 | Aggregate | Identity | Invariants |
 |---|---|---|
 | **Proclamation** | `proclamation_seq` (monotonic) | Text is immutable. Has a status (open / completed). Tied to a derived placeholder decision when applicable. |
-| **OperatorInbox** | Augustus singleton | Holds pending votes (J8), nudge requests, stuck-tray entries. |
 
 Inbound: `IssueProclamation`, `SendDirectMessage`, `EditCharter`,
-`CastBallot` (for the rare imperial vote).
+`CastBallot` (for the rare imperial vote). All four arrive via the
+Forum's REST POST to Observer, which translates to bus commands; see
+[07-c4](07-c4.md).
 Outbound: `ProclamationIssued`, `DirectMessageFromUser`, `CharterEdited`.
 
 ### C2 — Senate
@@ -117,7 +121,9 @@ collective-intelligence rules.
 | **Strategy** | name | Pure function `(ballots, eligible, context) → outcome \| open`. Four built-ins (majority / supermajority / consensus_omnium / sortition); plug-in shape (see [04-wardley](04-wardley.md) chain 6). |
 
 Inbound: `ProposeAdmission`, `ProposeExile`, `ProposeContractChange`,
-`ProposeCompletion`, `CastBallot`, `TickDeadline` (from a reactor).
+`ProposeCompletion`, `CastBallot`, `TickDeadline` (emitted by the
+Deadline Closer reactor, which runs **in the Senate process** — same
+context, no cross-context write).
 Outbound: `ProposalOpened`, `BallotCast`, `ProposalClosed(outcome)`.
 
 🟥 (from ES) — N=1 trivial pass is the strategy returning approved when
@@ -159,14 +165,32 @@ tablets; v2 enforces a non-trivial body invariant.
 ### C5 — Observation
 
 The read-model writer. The only context that *writes* state about
-"what is happening" — everyone else reads.
+"what is happening" — everyone else reads. Also hosts the **Augustus
+inbox read-model** (see below), and three of the four cross-cutting
+reactors (Health Watcher, Block Detector, Activity Digester — see
+[02-event-storming](02-event-storming.md)). The fourth reactor
+(Deadline Closer) lives in the Senate process.
 
 | Aggregate | Identity | Invariants |
 |---|---|---|
-| **PodState** | `pod_id` | Last known runtime status (running / stopped / not-yet-spawned), last agent state (thinking / idle / blocked-for), display role, container info. Updated only by reactors / OTel ingest, never by agents directly. |
+| **PodState** | `pod_id` | Last known runtime status (running / stopped / not-yet-spawned), last agent state (thinking / idle / blocked-for / **stuck**), display role, container info. Updated only by reactors (Health Watcher sets `stopped`; Block Detector sets `stuck`) and OTel ingest, never by agents directly. |
 | **Endpoint** | (`pod_id`, `method`, `path`) | Captured by OTel ingest. Has an optional annotation (pod-authored). |
 | **Call** | id | A single observed call: src pod, dst pod, endpoint, latency, status, time. Derived from OTel spans. |
 | **AgentTrace** | (`pod_id`, `turn_id`) | Live token stream + tool calls for one agent turn. Owned by the OpenLLMetry-backed store. |
+
+**Augustus inbox read-model** (not an aggregate; a read-only query
+endpoint exposed as `inbox` on the `state` MCP and as REST for the
+Forum). It joins three live sources on each read:
+
+- open ballots from C2 Senate where `Augustus ∈ eligible_voters`
+- PodState rows from C5 where `agent_state = stuck`
+- Council threads from C3 tagged `needs-augustus`
+
+There are no inbox tables, no inbound `InboxEntryCreated` events, no
+outbound `InboxEntryAcknowledged` events. Augustus "clearing" an entry
+maps to the underlying action (`CastBallot` for a ballot, dismissing a
+stuck flag, replying in the council thread). The inbox is a view, not
+a queue.
 
 Inbound: `IngestOTelSpan`, `RegisterPod`, `PodHealthChanged`.
 Outbound: `EndpointObserved`, `CallObserved`, `PodMarkedStuck`.
@@ -274,28 +298,39 @@ and the surface align.
 | Senate | `senate` | `propose_*`, `cast_ballot`, `list_open_proposals`, `outcome` |
 | Council | `coms` | `convene_council`, `post_message`, `close_council`, `dm` |
 | Decisions | `decisions` | `read`, `list`, `search`, `seal` |
-| Observation | `state` (read-only) | `members`, `endpoints`, `callers_of`, `calls_to`, `traces`, `health` |
+| Observation | `state` (read-only) | `members`, `endpoints`, `callers_of`, `calls_to`, `traces`, `health`, `inbox` |
 | Pod Lifecycle | `pods` (NEW, vs v1) | `register_self`, `rename_self`, `propose_image_swap` |
 | Agent Execution | (none, agent-internal) | charter on disk, sessions in CLI |
 
-So **6 MCP servers** total. v1's 4 collapse-and-expand: `coms`,
+So **5 MCP servers** total. v1's 4 collapse-and-expand: `coms`,
 `senate`, `decisions`, `state` stay (matched to contexts); `pods` is
 new (rename / image-swap / register-self surface for the
-self-organising mesh).
+self-organising mesh). Operator and Agent Execution have no MCP
+server — Operator's writes arrive via the Forum's REST POST to
+Observer; Agent Execution is agent-internal.
 
 ---
 
 ## Anti-corruption layers
 
 Two places where conclave reads OSS contracts; both need a thin ACL
-so OSS upgrades don't ripple into our domain.
+so OSS upgrades don't ripple into our domain. The DDD rule is to put
+each ACL **as close to the foreign system as possible**, so the
+foreign vocabulary never enters the rest of the codebase.
 
 1. **OTel ingest → Observation read-models.** We don't want OTel
    semantic conventions leaking into our `Call` / `Endpoint` types.
-   ACL: an ingest layer maps OTel attributes to our domain language.
-2. **Claude Code session → AgentExecution.** Claude Code's session
-   format may change. ACL: AgentSession aggregate stores only what we
-   need (pod_id, session_id, last_seen), not the raw session bytes.
+   **Lives in:** the Observer process — Observer is what receives
+   OTel spans, so the translation module is a submodule there. No
+   other component should ever import OTel types.
+2. **Claude Code session → Agent Execution.** Claude Code's session
+   format may change. **Lives in:** the **per-pod sidecar** that runs
+   the Claude Code CLI — the sidecar reads its own session file,
+   extracts `(pod_id, session_id, last_seen)`, and reports those
+   upward as a clean domain event. The Observer never sees the raw
+   session bytes. (Putting this ACL in Observer would force Observer
+   to learn Claude Code's session format — exactly the leak the ACL
+   is supposed to prevent.)
 
 ---
 
@@ -308,6 +343,9 @@ so OSS upgrades don't ripple into our domain.
   pod orchestration was a host-side script).
 - Decisions is a thin downstream of Senate + Council — it owns no
   policy, just the durable record.
-- Observation is purely a read-model writer, fed by published events
-  from every other context plus OTel. This matches v1's spirit
-  ("observer is the only writer of state") with stronger boundaries.
+- Observation is purely a read-model writer (writing its own schema),
+  fed by published events from every other context plus OTel. v1's
+  "observer is the only writer of state" loosens in v2: each context's
+  schema is written by exactly one process (the one that hosts that
+  context — usually the matching MCP server). Observer additionally
+  hosts the Operator context's writes and the Forum command fanout.
