@@ -2,15 +2,112 @@
 @import "@radix-ui/themes/styles.css";
 @import "@xyflow/react/dist/style.css";
 
+/* ── Illuminated theme tokens ────────────────────────────────────────
+ * Manuscript palette for authored cards (proclamations, charters,
+ * sealed decisions, council transcripts). The graph (ReactFlow) and
+ * platform chrome (badges, dropdowns, tabs) keep their library
+ * defaults — see services/forum/src/components/PodNode.tsx for how
+ * pod nodes apply manuscript tones without rebuilding ReactFlow.
+ * ----------------------------------------------------------------- */
 :root {
   color-scheme: dark;
+  --conclave-parchment: #f3e9c8;
+  --conclave-parchment-dim: #e2d5a8;
+  --conclave-ink: #2a1d0e;
+  --conclave-ink-dim: #5b4a2e;
+  --conclave-rubric: #8a2c1d;        /* red used in medieval rubrics */
+  --conclave-gold: #c79a3a;          /* illumination accent */
+  --conclave-gold-faint: rgba(199, 154, 58, 0.25);
+  --conclave-margin: rgba(199, 154, 58, 0.4);
+  --conclave-display-font: "Cinzel", "Trajan Pro", serif;
+  --conclave-body-font: "Cormorant Garamond", "EB Garamond", Georgia, serif;
 }
 
-html, body, #root {
+html,
+body,
+#root {
   height: 100%;
   margin: 0;
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    sans-serif;
+}
+
+/* Manuscript surfaces. Apply with className="manuscript". */
+.manuscript {
+  background: linear-gradient(
+    180deg,
+    var(--conclave-parchment) 0%,
+    var(--conclave-parchment-dim) 100%
+  );
+  color: var(--conclave-ink);
+  font-family: var(--conclave-body-font);
+  border: 1px solid var(--conclave-margin);
+  box-shadow: inset 0 0 24px var(--conclave-gold-faint);
+}
+
+.manuscript h1,
+.manuscript h2,
+.manuscript h3,
+.manuscript .rubric {
+  font-family: var(--conclave-display-font);
+  letter-spacing: 0.05em;
+  color: var(--conclave-rubric);
+}
+
+.manuscript .gold {
+  color: var(--conclave-gold);
+}
+
+.manuscript-numeral {
+  font-family: var(--conclave-display-font);
+  color: var(--conclave-gold);
+  letter-spacing: 0.1em;
+}
+
+/* Phylactery — Roman speech-bubble shape for council messages.
+ * Apply with className="phylactery"; container provides background. */
+.phylactery {
+  position: relative;
+  background: var(--conclave-parchment);
+  color: var(--conclave-ink);
+  font-family: var(--conclave-body-font);
+  padding: 0.75rem 1rem;
+  border-radius: 0.5rem;
+  border: 1px solid var(--conclave-margin);
+}
+
+.phylactery::after {
+  content: "";
+  position: absolute;
+  left: 1.5rem;
+  bottom: -0.5rem;
+  width: 0;
+  height: 0;
+  border-left: 0.5rem solid transparent;
+  border-right: 0.5rem solid transparent;
+  border-top: 0.5rem solid var(--conclave-parchment);
+}
+
+.phylactery .sender {
+  font-family: var(--conclave-display-font);
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  color: var(--conclave-rubric);
+  text-transform: uppercase;
+}
+
+/* EntityLink — clickable in-text reference to another forum entity. */
+.entity-link {
+  color: var(--conclave-gold);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.entity-link:hover {
+  color: var(--conclave-rubric);
 }
