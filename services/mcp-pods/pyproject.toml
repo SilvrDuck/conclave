@@ -1,0 +1,24 @@
+[project]
+name = "mcp-pods"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    { name = "Thibault Viglino", email = "thibault@thvi.ch" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "asyncpg>=0.31.0",
+    "conclave-core",
+    "fastmcp>=2.0",
+    "nats-py>=2.14.0",
+]
+
+[project.scripts]
+mcp-pods = "mcp_pods:main"
+
+[build-system]
+requires = ["uv_build>=0.9.26,<0.10.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+conclave-core = { workspace = true }

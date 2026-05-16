@@ -1,3 +1,33 @@
 kanban/
 graphify-out/
 
+# python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+.python-version
+*.egg-info/
+build/
+dist/
+
+# node
+node_modules/
+.pnpm-store/
+dist/
+.vite/
+
+# env
+.env
+.env.local
+
+# docker
+infra/traefik/dynamic/*.yml
+!infra/traefik/dynamic/.gitkeep
+infra/data/
+
+# logs
+*.log

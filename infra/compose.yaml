@@ -1,0 +1,253 @@
+# conclave platform compose.
+#
+# Profiles:
+#   conclave   — brings up the platform services (always-on for an op session).
+#   pod-<role> — one profile per admitted pod (added by the pods MCP server).
+#
+# Bootstrap: `docker compose --profile conclave up` (no custom script).
+# Per-pod:   `docker compose --profile pod-<role> up -d` (issued by the platform).
+#
+# State is persisted on named volumes; tearing the stack down with
+# `docker compose down` preserves project state.
+
+name: conclave
+
+networks:
+  conclave:
+    name: conclave
+
+volumes:
+  postgres_data:
+  nats_data:
+  tempo_data:
+
+services:
+
+  # ── reverse proxy ────────────────────────────────────────────────────
+  traefik:
+    image: traefik:v3.2
+    profiles: ["conclave"]
+    restart: unless-stopped
+    networks: [conclave]
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=conclave"
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--providers.file.watch=true"
+      - "--entrypoints.web.address=:80"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+    ports:
+      - "80:80"
+      - "8088:8080"  # traefik dashboard
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - ./traefik/dynamic:/etc/traefik/dynamic:ro
+
+  # ── storage ──────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16
+    profiles: ["conclave"]
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POSTGRES_USER: conclave
+      POSTGRES_PASSWORD: conclave
+      POSTGRES_DB: conclave
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U conclave"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  nats:
+    image: nats:2.10-alpine
+    profiles: ["conclave"]
+    restart: unless-stopped
+    networks: [conclave]
+    command: ["-js", "-sd", "/data", "-m", "8222"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"  # monitoring
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── observability ────────────────────────────────────────────────────
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.115.1
+    profiles: ["conclave"]
+    restart: unless-stopped
+    networks: [conclave]
+    command: ["--config=/etc/otel-collector.yaml"]
+    volumes:
+      - ./otel/collector.yaml:/etc/otel-collector.yaml:ro
+    ports:
+      - "4317:4317"  # OTLP gRPC
+      - "4318:4318"  # OTLP HTTP
+    depends_on:
+      - tempo
+
+  tempo:
+    image: grafana/tempo:2.6.1
+    profiles: ["conclave"]
+    restart: unless-stopped
+    networks: [conclave]
+    command: ["-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo/tempo.yaml:/etc/tempo.yaml:ro
+      - tempo_data:/var/tempo
+    ports:
+      - "3200:3200"  # tempo HTTP query API
+      - "9095:9095"  # tempo gRPC
+
+  # ── platform services ────────────────────────────────────────────────
+  observer:
+    profiles: ["conclave"]
+    build:
+      context: ..
+      dockerfile: infra/dockerfiles/observer.Dockerfile
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      DATABASE_URL: postgres://conclave:conclave@postgres:5432/conclave
+      NATS_URL: nats://nats:4222
+      TEMPO_URL: http://tempo:3200
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.observer.rule: "Host(`api.conclave.local`)"
+      traefik.http.routers.observer.entrypoints: "web"
+      traefik.http.services.observer.loadbalancer.server.port: "8000"
+    ports:
+      - "8000:8000"
+
+  mcp-senate:
+    profiles: ["conclave"]
+    build:
+      context: ..
+      dockerfile: infra/dockerfiles/mcp-senate.Dockerfile
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      DATABASE_URL: postgres://conclave:conclave@postgres:5432/conclave
+      NATS_URL: nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    ports:
+      - "8101:8000"
+
+  mcp-coms:
+    profiles: ["conclave"]
+    build:
+      context: ..
+      dockerfile: infra/dockerfiles/mcp-coms.Dockerfile
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      DATABASE_URL: postgres://conclave:conclave@postgres:5432/conclave
+      NATS_URL: nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    ports:
+      - "8102:8000"
+
+  mcp-decisions:
+    profiles: ["conclave"]
+    build:
+      context: ..
+      dockerfile: infra/dockerfiles/mcp-decisions.Dockerfile
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      DATABASE_URL: postgres://conclave:conclave@postgres:5432/conclave
+      NATS_URL: nats://nats:4222
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    ports:
+      - "8103:8000"
+
+  mcp-state:
+    profiles: ["conclave"]
+    build:
+      context: ..
+      dockerfile: infra/dockerfiles/mcp-state.Dockerfile
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      DATABASE_URL: postgres://conclave:conclave@postgres:5432/conclave
+      OBSERVER_URL: http://observer:8000
+    depends_on:
+      postgres:
+        condition: service_healthy
+      observer:
+        condition: service_started
+    ports:
+      - "8104:8000"
+
+  mcp-pods:
+    profiles: ["conclave"]
+    build:
+      context: ..
+      dockerfile: infra/dockerfiles/mcp-pods.Dockerfile
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      DATABASE_URL: postgres://conclave:conclave@postgres:5432/conclave
+      NATS_URL: nats://nats:4222
+      TRAEFIK_DYNAMIC_DIR: /traefik-dynamic
+      COMPOSE_PROJECT_DIR: /workspace
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    volumes:
+      - ./traefik/dynamic:/traefik-dynamic
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ..:/workspace
+    ports:
+      - "8105:8000"
+
+  forum-ui:
+    profiles: ["conclave"]
+    build:
+      context: ..
+      dockerfile: infra/dockerfiles/forum.Dockerfile
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      VITE_OBSERVER_URL: http://api.conclave.local
+    depends_on:
+      - observer
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.forum.rule: "Host(`forum.conclave.local`)"
+      traefik.http.routers.forum.entrypoints: "web"
+      traefik.http.services.forum.loadbalancer.server.port: "80"
+    ports:
+      - "5173:80"

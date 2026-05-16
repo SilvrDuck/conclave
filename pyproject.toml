@@ -1,0 +1,38 @@
+[project]
+name = "conclave"
+version = "0.2.0"
+description = "Consensus-driven, orchestrator-free platform for autonomous-agent microservices"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = [
+    "libs/conclave-core",
+    "services/observer",
+    "services/mcp-senate",
+    "services/mcp-coms",
+    "services/mcp-decisions",
+    "services/mcp-state",
+    "services/mcp-pods",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "httpx>=0.27",
+    "ruff>=0.7",
+    "mypy>=1.13",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "ASYNC", "RUF"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-ra"
