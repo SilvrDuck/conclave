@@ -18,9 +18,12 @@ exporters:
       insecure: true
   otlphttp/observer:
     # Observer ingests a small projection for the live call-graph; Tempo is
-    # the source of truth for full queries. Path matches the observer's
-    # POST /ingest/otel handler (see spec/07-c4.md Observer component view).
+    # the source of truth for full queries. The OTel exporter appends
+    # `/v1/traces` to the endpoint base — observer accepts JSON OTLP at
+    # that path (see services/observer/src/observer/api/ingest.py).
     endpoint: http://observer:8000/ingest/otel
+    encoding: json
+    compression: none
     tls:
       insecure: true
 

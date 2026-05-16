@@ -33,10 +33,30 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import urlparse
 
 SPAN_KIND_SERVER = "SPAN_KIND_SERVER"
 SPAN_KIND_CLIENT = "SPAN_KIND_CLIENT"
 SPAN_KIND_INTERNAL = "SPAN_KIND_INTERNAL"
+
+# OTLP wire format encodes span kind as int (0..5); libraries' protobuf-
+# JSON keeps strings. Accept either.
+_KIND_INT_TO_STR = {
+    0: "SPAN_KIND_UNSPECIFIED",
+    1: SPAN_KIND_INTERNAL,
+    2: SPAN_KIND_SERVER,
+    3: SPAN_KIND_CLIENT,
+    4: "SPAN_KIND_PRODUCER",
+    5: "SPAN_KIND_CONSUMER",
+}
+
+
+def _normalise_kind(raw: Any) -> str:
+    if isinstance(raw, int):
+        return _KIND_INT_TO_STR.get(raw, SPAN_KIND_INTERNAL)
+    if isinstance(raw, str) and raw.isdigit():
+        return _KIND_INT_TO_STR.get(int(raw), SPAN_KIND_INTERNAL)
+    return raw if isinstance(raw, str) else SPAN_KIND_INTERNAL
 
 
 @dataclass(frozen=True)
@@ -69,11 +89,19 @@ def translate_traces_request(
         service_name = _resource_attr(resource_span, "service.name")
         for scope_span in resource_span.get("scopeSpans", []):
             for span in scope_span.get("spans", []):
-                kind = span.get("kind", SPAN_KIND_INTERNAL)
+                kind = _normalise_kind(span.get("kind", SPAN_KIND_INTERNAL))
                 attrs = _attrs(span.get("attributes", []))
                 method = attrs.get("http.method") or attrs.get("http.request.method")
-                # http.route is the templated path; fall back to http.target.
-                path = attrs.get("http.route") or attrs.get("url.path") or attrs.get("http.target")
+                # http.route is the templated path; fall back to url.path /
+                # http.target / parsed URL.
+                url = attrs.get("http.url") or attrs.get("url.full")
+                parsed = urlparse(str(url)) if url else None
+                path = (
+                    attrs.get("http.route")
+                    or attrs.get("url.path")
+                    or attrs.get("http.target")
+                    or (parsed.path if parsed else None)
+                )
 
                 if kind == SPAN_KIND_SERVER and service_name and method and path:
                     endpoints.append(
@@ -81,7 +109,14 @@ def translate_traces_request(
                     )
 
                 if kind == SPAN_KIND_CLIENT and service_name and method and path:
-                    peer = attrs.get("peer.service") or attrs.get("server.address")
+                    # Prefer explicit semantic attrs; fall back to the URL host
+                    # (httpx auto-inst leaves it in http.url).
+                    peer = (
+                        attrs.get("peer.service")
+                        or attrs.get("server.address")
+                        or attrs.get("net.peer.name")
+                        or (parsed.hostname if parsed else None)
+                    )
                     if not peer:
                         continue
                     status_v = attrs.get("http.status_code") or attrs.get("http.response.status_code")

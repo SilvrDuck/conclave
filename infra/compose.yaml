@@ -243,6 +243,74 @@ services:
     environment:
       POD_ID: frontend
       DISPLAY_ROLE: frontend
+      OTEL_SERVICE_NAME: frontend
+      MCP_PODS_URL: http://mcp-pods:8000/mcp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      ENABLE_AGENT: "false"
+
+  # ── Spotify-clone demo pods (profile: spotify) ─────────────────────
+  web:
+    profiles: ["pod-web", "spotify"]
+    build:
+      context: ../pods/web
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POD_ID: web
+      DISPLAY_ROLE: web
+      OTEL_SERVICE_NAME: web
+      MCP_PODS_URL: http://mcp-pods:8000/mcp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      CATALOG_URL: http://catalog:8000
+      LYRICS_URL: http://lyrics:8000
+      JAM_URL: http://jam:8000
+      ENABLE_AGENT: "false"
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.web.rule: "Host(`web.conclave.local`)"
+      traefik.http.routers.web.entrypoints: "web"
+      traefik.http.services.web.loadbalancer.server.port: "8000"
+    ports:
+      - "9001:8000"
+
+  catalog:
+    profiles: ["pod-catalog", "spotify"]
+    build:
+      context: ../pods/catalog
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POD_ID: catalog
+      DISPLAY_ROLE: catalog
+      OTEL_SERVICE_NAME: catalog
+      MCP_PODS_URL: http://mcp-pods:8000/mcp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      ENABLE_AGENT: "false"
+
+  lyrics:
+    profiles: ["pod-lyrics", "spotify"]
+    build:
+      context: ../pods/lyrics
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POD_ID: lyrics
+      DISPLAY_ROLE: lyrics
+      OTEL_SERVICE_NAME: lyrics
+      MCP_PODS_URL: http://mcp-pods:8000/mcp
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      ENABLE_AGENT: "false"
+
+  jam:
+    profiles: ["pod-jam", "spotify"]
+    build:
+      context: ../pods/jam
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POD_ID: jam
+      DISPLAY_ROLE: jam
+      OTEL_SERVICE_NAME: jam
       MCP_PODS_URL: http://mcp-pods:8000/mcp
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       ENABLE_AGENT: "false"
@@ -274,6 +342,7 @@ services:
     environment:
       POD_ID: catalog-db
       DISPLAY_ROLE: catalog-db
+      OTEL_SERVICE_NAME: catalog-db
       MAIN_CONTAINER: pod-catalog-db
       MAIN_IMAGE: postgres:16
       MCP_PODS_URL: http://mcp-pods:8000/mcp

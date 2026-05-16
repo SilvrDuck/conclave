@@ -8,10 +8,11 @@ recent 1-2 minutes of edge data for the live graph view.
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 
 from observer.otel_acl import translate_traces_request
 
@@ -20,8 +21,26 @@ log = logging.getLogger("observer.api.ingest")
 router = APIRouter(prefix="/ingest", tags=["ingest"])
 
 
+# OTel collector's otlphttp exporter appends `/v1/traces` to the endpoint
+# base, so we register that path too. The legacy `/ingest/otel` POST stays
+# for direct curl tests. We accept raw bytes (the collector may send with
+# `application/x-protobuf` or `application/json` and FastAPI's automatic
+# body-parsing was tripping on the protobuf payloads with a 400).
 @router.post("/otel")
-async def ingest_otel(request: Request, body: dict[str, Any]) -> dict[str, int]:
+@router.post("/otel/v1/traces")
+async def ingest_otel(request: Request) -> dict[str, int]:
+    raw = await request.body()
+    content_type = request.headers.get("content-type", "")
+    if "json" not in content_type:
+        # Most likely OTLP/protobuf. We don't parse protobuf at v2 alpha
+        # (Tempo is the source of truth). Ack so the collector doesn't
+        # back-off; return a no-op.
+        return {"calls": 0, "endpoints": 0}
+    try:
+        body: dict[str, Any] = json.loads(raw)
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"invalid JSON: {e}") from e
+
     pool = request.app.state.observer.pool
     calls, endpoints = translate_traces_request(body)
 
