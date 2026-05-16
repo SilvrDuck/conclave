@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from mcp-senate!")
+"""mcp-senate — full implementation lands in feat/mcp-senate."""

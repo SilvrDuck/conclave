@@ -18,8 +18,9 @@ exporters:
       insecure: true
   otlphttp/observer:
     # Observer ingests a small projection for the live call-graph; Tempo is
-    # the source of truth for queries.
-    endpoint: http://observer:8000/ingest
+    # the source of truth for full queries. Path matches the observer's
+    # POST /ingest/otel handler (see spec/07-c4.md Observer component view).
+    endpoint: http://observer:8000/ingest/otel
     tls:
       insecure: true
 

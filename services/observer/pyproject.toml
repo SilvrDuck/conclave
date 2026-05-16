@@ -1,7 +1,7 @@
 [project]
 name = "observer"
 version = "0.1.0"
-description = "Add your description here"
+description = "Observer — Forum's API and read-model writer"
 authors = [
     { name = "Thibault Viglino", email = "thibault@thvi.ch" }
 ]
@@ -15,9 +15,6 @@ dependencies = [
     "sse-starlette>=2.1",
     "uvicorn[standard]>=0.32",
 ]
-
-[project.scripts]
-observer = "observer:main"
 
 [build-system]
 requires = ["uv_build>=0.9.26,<0.10.0"]

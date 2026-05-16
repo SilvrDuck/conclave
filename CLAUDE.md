@@ -1,5 +1,21 @@
 # Project
 
+## Development workflow
+
+- **PRs land on the current version branch (e.g. `vN`), not `main`.** Check which branch is the active target before opening a PR; do not push to `main` directly.
+- **Short-lived feature branches.** One logical unit per branch (one service, one feature). Merge often — keep branches small enough to review in one pass.
+- **Always go through PRs on GitHub.** `gh pr create --base <version-branch>`. Reference the kanban task in the PR body (e.g. `Closes kanban/tasks/005-observer-…md`).
+- **Get a code-review agent to review before merge.** Spawn a review agent after pushing; address the feedback; then merge.
+- **Backlog and triage as you go.** When you discover new work, add it to kanban-md as a task. Re-prioritise existing tasks as needed.
+
+## Kanban (kanban-md)
+
+- Use `kanban-md` as the task tracker for this repo. The board lives in `kanban/`.
+- Statuses flow: `backlog` → `todo` → `in-progress` → `review` → `done`.
+- Claim a task before moving to `in-progress` (`kanban-md move N in-progress --claim claude`).
+- Link kanban tasks from PR descriptions. When a PR merges, mark the task `done`.
+- When scope grows, file new tasks (`kanban-md create --title "..." --status todo --priority …`) instead of widening an in-flight one.
+
 ## Dev philosophy
 
 - Small functions. Declarative top levels. Parse at edge, fail fast.

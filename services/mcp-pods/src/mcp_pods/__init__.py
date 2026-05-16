@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from mcp-pods!")
+"""mcp-pods — full implementation lands in feat/mcp-pods."""
