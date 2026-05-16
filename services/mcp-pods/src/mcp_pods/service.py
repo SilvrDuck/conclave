@@ -113,12 +113,30 @@ class PodsService:
     # ─── reactors (consume events from senate, observer) ────────────────
 
     async def on_proposal_closed(self, data: dict[str, Any]) -> None:
-        """Apply approved senate proposals that touch a pod."""
+        """Apply approved senate proposals that touch a pod.
+
+        Currently handles admission (UPDATE admitted=TRUE + Traefik rule)
+        and image_swap (UPDATE image_strategy/main_image + PodImageSwapped).
+        Real container swap is deferred — the schema + event record the
+        intent; the actual `docker compose up` of the new image is a
+        follow-up.
+        """
         if data["outcome"] != "approved":
             return
         affected = data.get("affected") or []
         # senate now emits affected for admission/exile/image_swap as a
         # single pod_id (post-PR#6 fix). Match by what the row stores.
+
+        # Image swap is its own path because the senate payload carries
+        # the new image/mode, and we need PodImageSwapped (not PodAdmitted).
+        payload = data.get("payload") if isinstance(data, dict) else None
+        # The senate's ProposalClosed event doesn't include the payload by
+        # default. So we also subscribe to ProposalOpened (in the lifespan)
+        # to cache image_swap intents keyed by proposal_id, and look it up
+        # here. For v2 alpha we read the proposal back from the senate db.
+        if "Image swap" in str(data.get("summary", "")):
+            await self._handle_image_swap_close(data["proposal_id"])
+            return
         for pod_id in affected:
             row = await self._fetch_pod(pod_id)
             if row is None:
@@ -162,6 +180,50 @@ class PodsService:
             except OSError:
                 log.exception("failed to write Traefik rule for %s", pod_id)
 
+    async def _handle_image_swap_close(self, proposal_id: str) -> None:
+        """Look up the closed proposal in the senate schema, apply the
+        image-swap on the pods row, and emit PodImageSwapped."""
+        async with self._pool.acquire() as conn:
+            # Read the payload directly from senate.proposals (cross-schema
+            # read is acceptable; we don't write).
+            row = await conn.fetchrow(
+                """SELECT payload FROM senate.proposals
+                     WHERE proposal_id = $1 AND outcome = 'approved'""",
+                proposal_id,
+            )
+            if row is None or not row["payload"]:
+                log.warning("image_swap proposal %s payload missing", proposal_id)
+                return
+            payload = row["payload"]
+            pod_id = payload.get("pod_id")
+            new_image = payload.get("new_image")
+            new_mode = payload.get("new_mode", "code")
+            if not pod_id or not new_image:
+                return
+            old = await conn.fetchrow(
+                "SELECT main_image, image_strategy FROM pods.pods WHERE pod_id = $1",
+                pod_id,
+            )
+            old_image = (old["main_image"] if old else None) or "code"
+            await conn.execute(
+                """UPDATE pods.pods
+                      SET main_image = $2, image_strategy = $3
+                    WHERE pod_id = $1""",
+                pod_id,
+                new_image,
+                new_mode,
+            )
+        await self._bus.publish_event(
+            PodImageSwapped(
+                pod_id=pod_id,
+                old_image=old_image,
+                new_image=new_image,
+                new_mode=new_mode,
+            ),
+            PODS_CONTEXT,
+        )
+        log.info("PodImageSwapped %s: %s -> %s (%s)", pod_id, old_image, new_image, new_mode)
+
     async def on_pod_exited(self, data: dict[str, Any]) -> None:
         """Remove the pod's traefik rule when it leaves."""
         pod_id = data["pod_id"]
@@ -204,5 +266,3 @@ def _row_to_dict(row: asyncpg.Record) -> dict[str, Any]:
     }
 
 
-# Unused-import shim: PodImageSwapped is referenced for future image-swap work.
-_ = PodImageSwapped
