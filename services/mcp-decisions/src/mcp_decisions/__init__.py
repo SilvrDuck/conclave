@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Hello from mcp-decisions!")
+"""mcp-decisions — full implementation lands in feat/mcp-decisions."""

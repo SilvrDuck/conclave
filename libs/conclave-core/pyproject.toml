@@ -1,7 +1,7 @@
 [project]
 name = "conclave-core"
 version = "0.1.0"
-description = "Add your description here"
+description = "Shared events, models, bus and DB clients for conclave services"
 authors = [
     { name = "Thibault Viglino", email = "thibault@thvi.ch" }
 ]

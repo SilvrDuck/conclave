@@ -23,6 +23,7 @@ from typing import Any
 from nats.aio.client import Client as NATSClient
 from nats.js import JetStreamContext
 from nats.js.api import RetentionPolicy, StreamConfig
+from nats.js.errors import BadRequestError
 
 from conclave_core.events import DomainEvent
 
@@ -93,6 +94,11 @@ class Bus:
     async def _ensure_stream(
         self, *, name: str, subjects: list[str], retention: RetentionPolicy
     ) -> None:
+        """Create the stream; if it already exists, update its config.
+
+        Anything other than the well-known "already exists" path propagates —
+        a connection / auth / quota error must fail loudly, not be hidden.
+        """
         cfg = StreamConfig(
             name=name,
             subjects=subjects,
@@ -101,11 +107,13 @@ class Bus:
         )
         try:
             await self._js.add_stream(cfg)
-        except Exception:
-            try:
+        except BadRequestError as e:
+            # JetStream returns 10058 / "stream name already in use" when a
+            # stream with this name already exists. Reconfigure in place.
+            if e.err_code == 10058 or "already in use" in str(e).lower():
                 await self._js.update_stream(cfg)
-            except Exception:
-                pass
+            else:
+                raise
 
     # ─── publishing ───────────────────────────────────────────────────────
 

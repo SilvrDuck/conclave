@@ -31,3 +31,6 @@ infra/data/
 
 # logs
 *.log
+*.tsbuildinfo
+services/forum/dist/
+services/forum/src/*.js
