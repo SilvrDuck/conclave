@@ -17,6 +17,7 @@ from observer.services.command_router import (
     CommandRouter,
     EditCharterPayload,
     IssueProclamationPayload,
+    RestartPodPayload,
     SendDirectMessagePayload,
 )
 from observer.services.operator import OperatorService
@@ -32,12 +33,13 @@ class CommandBody(
             IssueProclamationPayload
             | SendDirectMessagePayload
             | EditCharterPayload
-            | CastBallotPayload,
+            | CastBallotPayload
+            | RestartPodPayload,
             Field(discriminator="kind"),
         ]
     ]
 ):
-    """Discriminated union root model for the 4 Forum writes."""
+    """Discriminated union root model for the Forum writes."""
 
 
 @router.post("")

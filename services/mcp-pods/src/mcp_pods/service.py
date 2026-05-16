@@ -231,6 +231,39 @@ class PodsService:
         except OSError:
             log.exception("failed to remove Traefik rule for %s", pod_id)
 
+    async def on_restart_pod(self, data: dict[str, Any]) -> None:
+        """ATAM Op4 — restart the named pod's container.
+
+        Augustus issues this via the Forum to recover a misbehaving
+        pod without exiling it. We invoke `docker restart` against
+        the conclave-<pod_id> container; Docker preserves the
+        container's identity + bind-mounts, so the agent resumes on
+        the next inbox event."""
+        import asyncio as _asyncio  # local: only on this path
+        pod_id = data.get("pod_id")
+        if not pod_id or not isinstance(pod_id, str):
+            log.warning("RestartPod missing pod_id; data=%r", data)
+            return
+        container = f"conclave-{pod_id}"
+        log.info("RestartPod: docker restart %s", container)
+        proc = await _asyncio.create_subprocess_exec(
+            "docker", "restart", container,
+            stdout=_asyncio.subprocess.PIPE,
+            stderr=_asyncio.subprocess.PIPE,
+        )
+        try:
+            _, stderr = await _asyncio.wait_for(proc.communicate(), timeout=30)
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
+            log.error("docker restart %s timed out", container)
+            return
+        if proc.returncode != 0:
+            log.error(
+                "docker restart %s failed rc=%s: %s",
+                container, proc.returncode, stderr.decode(errors="replace")[:300],
+            )
+
     async def on_pod_admitted(self, data: dict[str, Any]) -> None:
         """BroadcastMembership policy — spec/02 Phase 3.
 
