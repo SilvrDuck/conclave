@@ -22,6 +22,10 @@ log = logging.getLogger("mcp-decisions.service")
 
 DECISIONS_CONTEXT = "decisions"
 
+
+class DecisionAlreadySealed(ValueError):
+    """A redelivery / concurrent seal hit a row already in `sealed`."""
+
 # Bodies that look like a template placeholder are rejected at seal time
 # (spec/03-prototype-audit.md L113 — v1 had empty tablets nobody sealed).
 TEMPLATE_BODIES = {
@@ -88,11 +92,12 @@ class DecisionsService:
             return await self.create_placeholder(
                 title=title, origin_kind=origin_kind, origin_id=origin_id, affected=affected
             )
+        proc_seq = int(origin_id) if origin_kind == "proclamation" else None
         await self._bus.publish_event(
             DecisionPlaceholderCreated(
                 decision_id=decision_id,
                 title=title,
-                proclamation_seq=None,
+                proclamation_seq=proc_seq,
             ),
             DECISIONS_CONTEXT,
         )
@@ -120,7 +125,9 @@ class DecisionsService:
                 if row is None:
                     raise ValueError(f"unknown decision_id: {decision_id}")
                 if row["status"] == "sealed":
-                    raise ValueError(f"decision {decision_id} is already sealed")
+                    raise DecisionAlreadySealed(
+                        f"decision {decision_id} is already sealed"
+                    )
                 final_affected = list(affected) if affected is not None else list(row["affected"])
                 await conn.execute(
                     """UPDATE decisions.decisions
@@ -239,43 +246,54 @@ class DecisionsService:
         )
 
     async def on_proposal_closed(self, data: dict[str, Any]) -> None:
-        """Seal an ADR for approved proposals."""
+        """Seal an ADR for approved proposals. Idempotent on redelivery."""
         if data["outcome"] != "approved":
+            return
+        if await self._already_sealed_for(origin_kind="proposal", origin_id=data["proposal_id"]):
             return
         body = data.get("summary") or "proposal approved"
         title = f"Proposal {data['proposal_id']}: {_truncate(body)}"
-        try:
-            await self.seal_new(
-                title=title,
-                body=body,
-                origin_kind="proposal",
-                origin_id=data["proposal_id"],
-                affected=data.get("affected") or [],
-            )
-        except ValueError:
-            log.exception("seal proposal failed (already sealed?)")
+        await self.seal_new(
+            title=title,
+            body=body,
+            origin_kind="proposal",
+            origin_id=data["proposal_id"],
+            affected=data.get("affected") or [],
+        )
 
     async def on_council_closed(self, data: dict[str, Any]) -> None:
-        """Seal an ADR (or attach to existing) when a council closes."""
+        """Seal an ADR when a council closes. Idempotent on redelivery."""
         decision_id = data.get("decision_id")
         summary = data["summary"]
         if decision_id:
             try:
                 await self.seal(decision_id=decision_id, body=summary)
-            except ValueError:
-                log.exception("seal failed for %s", decision_id)
+            except DecisionAlreadySealed:
+                # idempotent redelivery — ack-and-drop.
+                return
+            # Other ValueErrors (e.g. unknown decision_id during a race with
+            # the placeholder writer) propagate so JetStream redelivers.
             return
         # No pre-allocated decision: create-and-seal a fresh one.
+        if await self._already_sealed_for(origin_kind="council", origin_id=data["council_id"]):
+            return
         title = f"Council {data['council_id']}: {_truncate(summary)}"
-        try:
-            await self.seal_new(
-                title=title,
-                body=summary,
-                origin_kind="council",
-                origin_id=data["council_id"],
+        await self.seal_new(
+            title=title,
+            body=summary,
+            origin_kind="council",
+            origin_id=data["council_id"],
+        )
+
+    async def _already_sealed_for(self, *, origin_kind: str, origin_id: str) -> bool:
+        async with self._pool.acquire() as conn:
+            r = await conn.fetchrow(
+                """SELECT 1 FROM decisions.decisions
+                     WHERE origin_kind = $1 AND origin_id = $2 AND status = 'sealed'""",
+                origin_kind,
+                origin_id,
             )
-        except ValueError:
-            log.exception("seal council failed")
+        return r is not None
 
 
 def _to_dict(row: asyncpg.Record) -> dict[str, Any]:
