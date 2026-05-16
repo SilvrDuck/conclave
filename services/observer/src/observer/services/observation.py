@@ -29,6 +29,9 @@ NAMED_EVENTS: set[str] = {
     "PodExited",
     "PodImageSwapped",
     "PodMarkedStuck",
+    "AgentBooted",
+    "AgentSessionStarted",
+    "PodCharterLoaded",
     "ProposalOpened",
     "ProposalClosed",
     "CouncilOpened",
@@ -189,6 +192,14 @@ class ObservationService:
                         """UPDATE observer.pod_state
                               SET agent_state = 'idle', last_seen = now()
                             WHERE pod_id = $1 AND agent_state = 'thinking'""",
+                        data["pod_id"],
+                    )
+            case "AgentBooted":
+                async with self._pool.acquire() as conn:
+                    await conn.execute(
+                        """UPDATE observer.pod_state
+                              SET agent_state = 'idle', last_seen = now()
+                            WHERE pod_id = $1""",
                         data["pod_id"],
                     )
 
