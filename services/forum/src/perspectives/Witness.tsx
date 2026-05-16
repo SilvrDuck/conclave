@@ -147,10 +147,11 @@ function CouncilCard({
   c: Council;
   onPodClick: (id: string) => void;
 }) {
+  // Live updates come through SSE's MessagePosted handler; no client poll
+  // (avoid an N-councils × 4s poll storm).
   const { data: msgs } = useSWR<CouncilMessage[]>(
     `/state/councils/${c.council_id}/messages`,
     fetcher,
-    { refreshInterval: 4000 },
   );
   return (
     <Card className="mb-2">

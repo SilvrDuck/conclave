@@ -12,6 +12,7 @@ import {
   TextField,
   Separator,
   Tabs,
+  VisuallyHidden,
 } from "@radix-ui/themes";
 import {
   Call,
@@ -41,6 +42,12 @@ export function PodDrawer({
         align="start"
         style={{ position: "fixed", right: 0, top: 0, bottom: 0, height: "100vh" }}
       >
+        <VisuallyHidden>
+          <Dialog.Title>Pod details: {podId ?? ""}</Dialog.Title>
+          <Dialog.Description>
+            Inspect a pod's endpoints, calls, charter, and DM with it.
+          </Dialog.Description>
+        </VisuallyHidden>
         {podId && <PodInside podId={podId} />}
       </Dialog.Content>
     </Dialog.Root>
