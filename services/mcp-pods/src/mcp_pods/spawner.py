@@ -86,8 +86,11 @@ def render_pod_dir(pod_id: str, display_role: str) -> Path:
 
 async def compose_up(pod_id: str) -> None:
     """Run `docker compose -f infra/compose.yaml -f pods/<id>/pod.compose.yaml
-    --profile pod-<id> up -d --build` from $HOST_PROJECT_DIR (mcp-pods's
-    /workspace mount, which the daemon sees as the host project root)."""
+    --profile pod-<id> up -d` from $HOST_PROJECT_DIR (mcp-pods's
+    /workspace mount, which the daemon sees as the host project root).
+
+    The pod service is image-based (uses the prebuilt
+    conclave/pod-template), so no --build flag is needed."""
     pod_compose = f"pods/{pod_id}/pod.compose.yaml"
     cmd = [
         "docker",
@@ -100,7 +103,6 @@ async def compose_up(pod_id: str) -> None:
         f"pod-{pod_id}",
         "up",
         "-d",
-        "--build",
     ]
     log.info("compose up: %s", " ".join(cmd))
     proc = await asyncio.create_subprocess_exec(

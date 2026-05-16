@@ -233,13 +233,22 @@ class PodsService:
     async def on_proclamation_issued(self, _data: dict[str, Any]) -> None:
         """SpawnFirstPod policy — spec/02 Phase 1 last row.
 
-        Race-safe: claim a placeholder row inside one transaction so two
-        concurrent deliveries of the same event can't both spawn. The
-        first claimer launches the container; redeliveries see
-        count(non-exiled) > 0 and exit.
+        Race-safe under NATS redelivery via a transaction-scoped
+        Postgres advisory lock. asyncpg's default isolation is READ
+        COMMITTED, so a plain COUNT+INSERT lets two concurrent
+        deliveries each see zero pods and both insert new pod_ids
+        (different PKs, so no unique-constraint backstop). The
+        advisory lock serialises the check-and-claim instead.
         """
         async with self._pool.acquire() as conn:
             async with conn.transaction():
+                # Lock key derived from the policy name; the same key
+                # for every delivery so concurrent calls queue.
+                await conn.execute(
+                    "SELECT pg_advisory_xact_lock("
+                    "hashtextextended('mcp-pods:spawn-first', 0)"
+                    ")"
+                )
                 n = await conn.fetchval(
                     "SELECT COUNT(*) FROM pods.pods WHERE NOT exiled"
                 )
