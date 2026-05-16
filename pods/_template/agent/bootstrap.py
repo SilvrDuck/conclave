@@ -3,12 +3,11 @@
 What this script does (v2 alpha):
 1. Reads its identity from env (POD_ID, DISPLAY_ROLE).
 2. Calls `register_self` on the platform's `mcp-pods` server.
-3. Reads charter.md and stores it for the agent loop.
-4. If `ENABLE_AGENT=true`, launches the Claude Code CLI in workspace/
-   with the MCP servers configured. Otherwise idles, awaiting either
-   a manual `docker exec` or an env flip + restart.
-5. Concurrently runs the workspace's service entrypoint with
+3. If `ENABLE_AGENT=true`, launches the Claude Code agent loop.
+4. Concurrently runs the workspace's service entrypoint with
    `opentelemetry-instrument` so HTTP traces flow into the collector.
+5. On SIGTERM, terminates the workspace subprocess gracefully before
+   exiting so the orchestrator doesn't have to SIGKILL.
 
 The Claude Code subprocess part is intentionally minimal at v2 alpha —
 it can be enabled when API credentials are available; until then the
@@ -25,7 +24,6 @@ import signal
 import sys
 from pathlib import Path
 
-import httpx
 from fastmcp.client import Client
 
 log = logging.getLogger("pod.bootstrap")
@@ -33,9 +31,27 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname
 
 
 MCP_PODS_URL = os.environ.get("MCP_PODS_URL", "http://mcp-pods:8000/mcp")
+MCP_PODS_TIMEOUT = float(os.environ.get("MCP_PODS_TIMEOUT", "10"))
 WORKSPACE_DIR = Path(os.environ.get("WORKSPACE_DIR", "/pod/workspace"))
-SERVICE_CMD = os.environ.get("SERVICE_CMD", "uvicorn main:app --host 0.0.0.0 --port 8000 --reload")
+SERVICE_PORT = os.environ.get("SERVICE_PORT", "8000")
 ENABLE_AGENT = os.environ.get("ENABLE_AGENT", "false").lower() == "true"
+
+# Fixed argv for the workspace process — no shell, no env-driven command
+# string. The agent influences shape via the workspace files it writes,
+# not via SERVICE_CMD env.
+SERVICE_ARGV = (
+    "opentelemetry-instrument",
+    "uvicorn",
+    "main:app",
+    "--host",
+    "0.0.0.0",
+    "--port",
+    SERVICE_PORT,
+    "--reload",
+)
+
+# Track the currently-running service subprocess so SIGTERM can stop it.
+_current_proc: asyncio.subprocess.Process | None = None
 
 
 async def register() -> None:
@@ -45,7 +61,7 @@ async def register() -> None:
         log.error("POD_ID env var required")
         sys.exit(1)
     charter_path = "/pod/charter.md"
-    async with Client(MCP_PODS_URL) as c:
+    async with Client(MCP_PODS_URL, timeout=MCP_PODS_TIMEOUT) as c:
         result = await c.call_tool(
             "register_self",
             {
@@ -59,18 +75,20 @@ async def register() -> None:
 
 
 async def run_service() -> int:
-    """Run the workspace service with otel auto-instrumentation. The
-    process becomes a child we supervise; if it crashes we re-spawn."""
+    """Run the workspace service with otel auto-instrumentation under a
+    fixed argv (no shell). Tracks the live subprocess in `_current_proc`
+    so shutdown can SIGTERM it."""
+    global _current_proc
     if not WORKSPACE_DIR.exists():
         log.error("workspace dir %s missing", WORKSPACE_DIR)
         return 1
     while True:
-        log.info("starting service: %s", SERVICE_CMD)
-        proc = await asyncio.create_subprocess_shell(
-            f"opentelemetry-instrument {SERVICE_CMD}",
-            cwd=str(WORKSPACE_DIR),
+        log.info("starting service: %s", " ".join(SERVICE_ARGV))
+        _current_proc = await asyncio.create_subprocess_exec(
+            *SERVICE_ARGV, cwd=str(WORKSPACE_DIR)
         )
-        rc = await proc.wait()
+        rc = await _current_proc.wait()
+        _current_proc = None
         log.warning("service exited rc=%s; restarting in 2s", rc)
         await asyncio.sleep(2)
 
@@ -82,6 +100,21 @@ async def agent_loop() -> None:
     while True:
         # In a real run: invoke Claude Code per-turn here.
         await asyncio.sleep(60)
+
+
+async def shutdown_subprocess() -> None:
+    global _current_proc
+    proc = _current_proc
+    if proc is None or proc.returncode is not None:
+        return
+    log.info("terminating workspace subprocess (pid=%s)", proc.pid)
+    try:
+        proc.terminate()
+        await asyncio.wait_for(proc.wait(), timeout=5)
+    except (asyncio.TimeoutError, ProcessLookupError):
+        log.warning("subprocess didn't exit in 5s, killing")
+        proc.kill()
+        await proc.wait()
 
 
 async def main() -> None:
@@ -102,6 +135,10 @@ async def main() -> None:
     done, _ = await asyncio.wait(
         {*tasks, waiter}, return_when=asyncio.FIRST_COMPLETED
     )
+
+    # Terminate the workspace subprocess so docker stop is fast.
+    await shutdown_subprocess()
+
     for t in tasks:
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
