@@ -377,6 +377,34 @@ async def list_pod_turns(
     ]
 
 
+@router.get("/traces")
+async def list_traces(
+    request: Request, pod_id: str, limit: int = 20
+) -> dict[str, Any]:
+    """Recent OTel traces involving `pod_id` (service.name match).
+    spec/05 §C5 mandates a `traces` state surface; this is the read
+    side. Falls back to an empty list if Tempo isn't reachable so
+    the Forum doesn't break on a degraded stack."""
+    _validate_pod_id(pod_id)
+    limit = max(1, min(limit, 100))
+    tempo = request.app.state.observer.tempo
+    traces = await tempo.search_by_service(pod_id, limit=limit)
+    return {"pod_id": pod_id, "traces": traces}
+
+
+@router.get("/traces/{trace_id}")
+async def get_trace(request: Request, trace_id: str) -> dict[str, Any]:
+    """Full trace tree for `trace_id`. 404 if Tempo doesn't know it
+    (window expired or the id is bogus)."""
+    if not re.fullmatch(r"[a-f0-9]{8,32}", trace_id):
+        raise HTTPException(status_code=400, detail="invalid trace_id")
+    tempo = request.app.state.observer.tempo
+    trace = await tempo.fetch_trace(trace_id)
+    if trace is None:
+        raise HTTPException(status_code=404, detail="trace not found")
+    return trace
+
+
 @router.get("/spec/{filename}")
 async def get_spec_file(filename: str) -> dict[str, Any]:
     """Read a spec/<filename>.md so the Forum 'Spec' link can render
