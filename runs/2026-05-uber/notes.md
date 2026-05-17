@@ -1,88 +1,156 @@
-# Pass-2 — Design Uber
+# Pass-2 → Pass-4 — Design Uber
 
-**Date**: 2026-05-17
-**Branch**: v2 (post #95 merge)
-**Scenario**: Design Uber. Riders request rides; drivers accept and complete them; pricing surges when demand outstrips supply. One pod is the real-world simulator.
-**Architect**: Augustus (driven by Claude / no human in the loop)
-**Outcome**: **Loop did not close**. The platform booted cleanly, the first pod spawned and consumed the proclamation, but the agent's first turn returned with `tokens_in=0 tokens_out=0` and the swarm stopped progressing. New platform-gap tasks filed below.
+The realize → analyze → nuke loop ran four times on 2026-05-17. Pass-2
+and pass-3 were diagnostic; pass-4 reached spec/08 §3 admission.
 
 ---
 
-## §1 — What worked
+## Pass-2 (rev v2 + #36 + #38 + #39 + #40 + #42)
 
-Recorded as one-line acceptance signals against [spec/08](../../spec/08-v2-acceptance.md):
+**Outcome**: agent's first turn returned `tokens_in=0 tokens_out=0`,
+swarm stalled at boot.
 
-- §0 **Empty state**: the Forum's Glance perspective renders the parchment torn-leaf insert correctly with `Speak, and the conclave begins.` and no leftover counters. ✓
-- §1 **One write affordance**: the empty-state proclamation field is the only write. ✓
-- §2 **Proclamation reception**: within ~1 s of submitting, `ProclamationIssued` lands in observer activity and the Bandeau numeral updates to `№ I`. ✓
-- §2 **First-pod spawn (SpawnFirstPod)**: a pod-id was minted and the container brought up within ~1 s of the proclamation. ✓
-- §6 **OpenLLMetry-style span around the Claude turn**: `agent_turns` has a row with `started_at` / `ended_at`. ✓ (but with zero token counts — see gap G18 below)
-- §11 **Reset**: clicking Reset on the Forum, or `POST /commands {kind: ResetState}`, wipes back to zero pods / proclamations / activity in ~5 s. ✓ (verified earlier as part of #93)
-
-What the Forum surface delivered on:
-- Pod-Cartouche node renders with correct state-pip colour cycle (`not_yet_spawned` → `running` → `stopped`).
-- The Roll right-rail shows the four bootstrap events in rubric verbs: `PROCLAIMED`, `SPAWNED`, `BOOTED`, `LOADED`.
-- Witness Codex renders the proclamation with its drop cap on the first paragraph (and only there — the FolioDrawer drops the cap as spec/09 §3 mandates).
-- StuckTray surfaces the pod as "container stopped" once HealthWatcher flips it.
-
----
-
-## §2 — What did not work
-
-### Platform-gap G18 — Claude turn returns `tokens_in=0 tokens_out=0`
-
-**Observed**: pod-73fb7c806fcd's only Claude turn (turn `6a63c260085e`, duration ~30 s, exit code 0) recorded zero input and zero output tokens. The pod's `agent_turns` projection shows the timing but no usage. The pod then sat idle — no rename, no proposal, no work.
-
-**Hypothesis** (in order of plausibility):
-1. The bootstrap `stream-json` parser at `pods/_template/agent/bootstrap.py:284-331` is reading from an empty stream because Claude CLI silently authenticated against the wrong endpoint or printed no events.
-2. The credentials at `/root/.claude/.credentials.json` are present but the binary at `/opt/claude/2.1.143` couldn't find them (mount-path mismatch).
-3. `--output-format stream-json` is being ignored at this Claude version.
-
-The agent printed no model output to stdout or stderr that the bootstrap captured — only the harness lines around the turn. **This is the headline platform gap of pass-2** because every downstream step (rename, propose, build) depends on the agent actually producing text.
-
-### Platform-gap G19 — `SendDirectMessage` from Augustus never reaches the pod's inbox
-
-**Observed**: I sent a `SendDirectMessage` via `POST /commands`. The flow was:
-1. observer's `OperatorService.fan_out_forum_command` → `publish_command("SendDirectMessage", payload, "council")`.
-2. mcp-coms picked it up, called `ComsService.dm()`, opened council `council-26effa85086b` between `__augustus__` and `pod-73fb7c806fcd`, posted the body, emitted `CouncilOpened` + `MessagePosted` to JetStream.
-
-The pod's bootstrap (`pods/_template/agent/bootstrap.py:432-436`) only subscribes to:
-- `conclave.inbox.<pod_id>` — core NATS, no one publishes to it for DMs
-- `conclave.events.operator.ProclamationIssued`
-- `conclave.events.operator.DirectMessageFromUser`
-
-`MessagePosted` and `CouncilOpened` go to the council context, not to `conclave.inbox.<pod_id>` or `DirectMessageFromUser`. **The pod literally has no listener for the DM path.** Spec/02 Phase 7 says "MessagePosted(... from=__user__) delivered to pod inbox" — the platform doesn't deliver.
-
-Fix: mcp-coms should fan out the message to `conclave.inbox.<pod_id>` (core NATS) whenever a Augustus-DM message is posted; OR operator should publish a `DirectMessageFromUser` event when `SendDirectMessage` is the command kind.
-
-### Platform-gap G20 — `/ingest/pod-activity` 404 spam
-
-**Observed**: observer logs show ~10 POST `/ingest/pod-activity` per second returning 404. The path doesn't exist in `observer/api/ingest.py` (only `/ingest/otel` and `/ingest/otel/v1/traces` are defined). The source isn't a current service in this repo's `services/` (grep confirms no live code emits to that path).
-
-Hypothesis: a stale client lingering on this dev box from v1, or a Tempo health probe with the wrong path. Harmless (observer 404s and keeps running) but noisy in logs and a sign something off-tree is leaking traffic.
-
-Fix: either drop the offending client (figure out what's polling — probably a leftover from a previous architecture) or add a 204 catch-all on `/ingest/pod-activity` with a deprecation log line.
-
-### Platform-gap G21 — `runtime_status` flips to "stopped" while the container is still running
-
-**Observed**: `/state/pods` reports `runtime_status=stopped` for pod-73fb7c806fcd at T+2 minutes, but `docker ps` confirms `conclave-pod-73fb7c806fcd` is `Up 5 minutes`. The pod is alive; only its OTel-span emission stopped (because the agent isn't doing anything).
-
-HealthWatcher's staleness threshold (~2 min of no spans) is too aggressive given the realistic case of a long-thinking agent. Spec/08 §10 R1 says "node turns red within 5 s of container kill" — but this is the reverse: a healthy container is being marked stopped on a long pause.
-
-Fix: HealthWatcher should distinguish `agent_state=thinking` from `runtime_status=stopped`. The first means "no spans, but the container heartbeat tells us it's alive"; the second means "the container itself is gone". Today only the staleness path exists.
-
-(This is exactly the docker-events subscription requested by kanban #24, which now becomes load-bearing rather than nice-to-have.)
+Fixes filed and merged:
+- **#98 (G18)** — Claude CLI requires `--verbose` with
+  `--print --output-format=stream-json`; without it the subprocess
+  exits silently rc=0.
+- **#99 (G19)** — `SendDirectMessage` from Augustus never reached the
+  recipient pod. `ComsService.post_message` now fans Augustus DMs out
+  to `conclave.inbox.<recipient>` on core NATS so the pod's bootstrap
+  inbox subscription actually fires.
+- **#100 (G20)** — `/ingest/pod-activity` 404 spam from an unknown
+  client; backlog (cosmetic).
+- **#101 (G21)** — HealthWatcher false-flipped a live container to
+  `runtime_status=stopped` after 2 min of OTel silence; deferred.
 
 ---
 
-## §3 — Personality observations
+## Pass-3 (rev v2 + G18 fix)
 
-Almost none — the swarm never got past the first turn. The single Claude turn produced no captured output, so there's no quotation to record. **The personality-as-quotation principle from spec/09 cannot land if the agent doesn't speak.**
+**Outcome**: turn 1 still rc=0 with no events. Discovered two more
+bugs in pods/_template:
+
+1. Claude CLI refuses `--dangerously-skip-permissions` when the
+   process runs as **root** ("cannot be used with root/sudo
+   privileges for security reasons"). Pod container had been running
+   as root.
+2. The bootstrap passed the prompt as a trailing positional argv,
+   but `--add-dir <directories...>` is variadic and slurps the prompt
+   as another directory. Claude exited with "Input must be provided
+   either through stdin or as a prompt argument".
+
+Both fixed in PR #46:
+- `pods/_template/Dockerfile` creates a `pod` user (uid 1000) +
+  `USER pod` + `HOME=/home/pod`; compose template binds credentials
+  at `/home/pod/.claude/.credentials.json`. (Also closes kanban #97.)
+- `bootstrap._run_claude` pipes the prompt via stdin so argv parsing
+  can't confuse it.
+
+While there, added a 5-minute annotation reconciler (#89) that
+re-publishes RequestAnnotation for un-annotated endpoints whose
+first reactor fire was lost.
 
 ---
 
-## §4 — Recommendation
+## Pass-4 (rev v2 + #46)
 
-Pass-2 closed with the loop not terminating; new platform-gap tasks (#G18–G21 above) filed in kanban. Pass-3 should run only after **G18 (zero-token Claude turn) and G19 (DM-to-inbox routing)** are fixed — these are the load-bearing failures. The other two (404 spam, HealthWatcher false-stopped) are quality-of-life and can be deferred.
+**Outcome**: the swarm actually moved. pod-a078fee2db70 spawned,
+read the proclamation, decided its role, proposed its own admission
+via `consensus_omnium` with N=1 eligibility, voted yes on its own
+proposal, the senate auto-closed the proposal as approved within
+~10 s, and the decisions context sealed adr-951807ef1be6.
 
-When pass-3 runs, the realize → analyze → nuke loop closes if no new platform-gap tasks are filed during analyze.
+Wall-clock timeline:
+
+| t (s) | event |
+|------|-------|
+| 0 | `ProclamationIssued` |
+| 8 | `PodContainerStarted` |
+| 8 | `AgentBooted` · `PodCharterLoaded` · `AgentSessionStarted` |
+| 20 | first MCP tool calls: `state.proclamations`, `state.members`, `pods.list_pods` |
+| 20 | text: "I see the proclamation: design Uber with riders, drivers, and surge" |
+| 20 | `mcp__senate__propose_admission` — proposes as **simulator** role |
+| 20 | `ProposalOpened(prop-d94d5ba25374, kind=admission, strategy=consensus_omnium)` |
+| 20 | `BallotCast(yes, auto: proposer endorsement)` |
+| 20 | `ProposalClosed(outcome=approved)` |
+| 20 | `PodAdmitted` |
+| 20 | `DecisionSealed(adr-951807ef1be6)` |
+| 24 | `AgentTurnEnded` rc=0, num_turns=5, duration 15s |
+
+§1, §2, §3 of spec/08 acceptance demonstrated cleanly. The first
+agent turn captured tool calls, sealed a real decision, and the
+N=1 admission auto-pass works without any special-case code path —
+exactly the v2 vision (spec/08 §3).
+
+### Personality observation
+
+Quoted verbatim from the agent's `text` content (Witness drop-cap
+material):
+
+> *"I'm reading my charter and bootstrapping as a platform agent. Let
+> me first explore the current state of the conclave and identify my
+> role."*
+
+> *"I see the proclamation: design Uber with riders, drivers, and
+> surge pricing. As the bootstrapping agent, I should propose my own
+> admission. Looking at the system, I see no other pods exist yet."*
+
+The agent picked **simulator** as its role — directly motivated by
+the proclamation's "One pod is the real-world simulator" mandate.
+Its charter for admission was:
+
+> "The simulator is the real-world authority for Uber. It generates
+> rider requests with origin/destination/time, simulates driver
+> locations, movement, and availability, adjudicates trip outcomes,
+> manages time progression, exposes the current world state."
+
+That's real product reasoning encoded in the admission proposal,
+not boilerplate.
+
+### New gap discovered: G22 — session resume fails
+
+A follow-up DM ("rename yourself + propose other pods") triggered a
+second turn that died immediately with `--resume <session_id>` →
+"No conversation found with session ID". Claude CLI couldn't find
+the cached session id on disk because `$HOME/.claude` in the pod is
+basically read-only (only the credential file is mounted).
+
+Hotfix in bootstrap: on rc=1, clear the cached `_session_id` so the
+next turn starts fresh. Commit on the same branch as the pass-4
+notes; will be folded into pass-5.
+
+---
+
+## §1–§11 acceptance status
+
+| § | Criterion | Pass-4 |
+|---|---|---|
+| §1 | empty-state, one write affordance, no zero counters | ✓ |
+| §2 | proclamation card within 3 s | ✓ (~1 s) |
+| §3 | first-pod renames itself | ✗ DM-triggered second turn failed (G22) |
+| §3 | admission proposal | ✓ |
+| §3 | N=1 auto-pass | ✓ |
+| §3 | admission seals a decision | ✓ |
+| §4 | three of four strategies fire | ✗ only consensus_omnium fired |
+| §5 | 5–10 pods admitted | ✗ only one (simulator) |
+| §6 | live token stream + tool-call rendering | ✓ (stream-json events captured in `agent_turns`) |
+| §7–§10 | depend on §5 multi-pod scenarios | ✗ pending |
+| §11 | ResetState | ✓ (verified pre-pass) |
+
+§4 / §5 / §7–§10 need more pods — which depend on the simulator
+either fanning out admission proposals itself (it didn't, at
+haiku/low effort) or Augustus driving the DM-triggered fan-out
+(currently blocked by G22).
+
+---
+
+## Loop status
+
+The loop hasn't terminated yet — pass-4 filed G22, which needs a
+hotfix (already coded in this commit). Pass-5 will run after merge.
+
+**Realistic budget note**: the swarm runs on Augustus's Anthropic
+account, which `rate_limit_info.overageStatus` reports as
+`"rejected"`/`"out_of_credits"`. Pass-4 still completed because the
+five-hour primary quota was within bounds, but a longer multi-pod
+run may hit the wall.
