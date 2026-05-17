@@ -271,6 +271,18 @@ class PodsService:
                 )
             except OSError:
                 log.exception("failed to write Traefik rule for %s", pod_id)
+            # Spawn the container if this admission referred to a pod
+            # that has no running container yet. The simulator proposes
+            # peer pods (`rider-app`, `dispatch`, …) which the platform
+            # then needs to materialise. SpawnFirstPod only handles the
+            # first pod; this branch handles every subsequent admitted
+            # peer. Spec/08 §5 (multi-pod swarm).
+            if not await self._container_alive(pod_id):
+                log.info("SpawnPostAdmission: bringing up container for %s", pod_id)
+                try:
+                    await spawn_pod(pod_id, row["display_role"])
+                except SpawnError:
+                    log.exception("SpawnPostAdmission failed for %s", pod_id)
 
     async def _handle_image_swap_close(self, proposal_id: str) -> None:
         """Look up the closed proposal in the senate schema, apply the
