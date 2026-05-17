@@ -6,6 +6,7 @@ business logic here; just selects and shape-conversions.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 from datetime import UTC, datetime, timedelta
@@ -108,26 +109,35 @@ async def list_proposals(request: Request) -> list[dict[str, Any]]:
              LIMIT 100
             """
         )
-    return [
-        {
-            "proposal_id": r["proposal_id"],
-            "kind": r["kind"],
-            "proposer": r["proposer"],
-            "strategy": r["strategy"],
-            "summary": r["summary"],
-            "payload": r["payload"],
-            "eligible_voters": list(r["eligible_voters"]),
-            "deadline": r["deadline"].isoformat(),
-            "outcome": r["outcome"],
-            "opened_at": r["opened_at"].isoformat(),
-            "closed_at": r["closed_at"].isoformat() if r["closed_at"] else None,
-            "ballots": [
-                {**b, "cast_at": b["cast_at"]}
-                for b in (r["ballots"] or [])
-            ],
-        }
-        for r in rows
-    ]
+    out: list[dict[str, Any]] = []
+    for r in rows:
+        # asyncpg's jsonb codec deserialises top-level jsonb columns
+        # but doesn't always reach into LATERAL subquery outputs. Parse
+        # defensively: dict-list passthrough, str → json.loads, None → [].
+        raw_ballots = r["ballots"]
+        if isinstance(raw_ballots, str):
+            try:
+                raw_ballots = json.loads(raw_ballots)
+            except json.JSONDecodeError:
+                raw_ballots = []
+        ballots = raw_ballots or []
+        out.append(
+            {
+                "proposal_id": r["proposal_id"],
+                "kind": r["kind"],
+                "proposer": r["proposer"],
+                "strategy": r["strategy"],
+                "summary": r["summary"],
+                "payload": r["payload"],
+                "eligible_voters": list(r["eligible_voters"]),
+                "deadline": r["deadline"].isoformat(),
+                "outcome": r["outcome"],
+                "opened_at": r["opened_at"].isoformat(),
+                "closed_at": r["closed_at"].isoformat() if r["closed_at"] else None,
+                "ballots": ballots,
+            }
+        )
+    return out
 
 
 @router.get("/councils")
