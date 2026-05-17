@@ -55,6 +55,24 @@ def _host_env() -> dict[str, str]:
     }
 
 
+def _chown_to_host(path: Path) -> None:
+    """Recursively chown `path` to HOST_UID:HOST_GID. mcp-pods runs as
+    root inside its container, so without this every rendered file is
+    owned by root on the host and `rm -rf` from the loop fails."""
+    try:
+        uid = int(os.environ["HOST_UID"])
+        gid = int(os.environ["HOST_GID"])
+    except (KeyError, ValueError):
+        log.warning("HOST_UID/HOST_GID not set; skipping chown of %s", path)
+        return
+    if uid == 0 and gid == 0:
+        return
+    os.chown(path, uid, gid)
+    for root, dirs, files in os.walk(path):
+        for name in dirs + files:
+            os.chown(os.path.join(root, name), uid, gid)
+
+
 def render_pod_dir(pod_id: str, display_role: str) -> Path:
     """Copy pods/_template -> pods/<pod_id>/ and render the compose
     snippet. Idempotent: returns the existing dir if it's already there.
@@ -81,6 +99,7 @@ def render_pod_dir(pod_id: str, display_role: str) -> Path:
     )
     out_path.write_text(rendered)
     log.info("rendered %s", out_path)
+    _chown_to_host(pod_dir)
     return pod_dir
 
 
