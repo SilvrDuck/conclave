@@ -2,17 +2,12 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { Cross1Icon, ChevronLeftIcon } from "@radix-ui/react-icons";
 import { Box, Flex, IconButton, Text } from "@radix-ui/themes";
 import useSWR from "swr";
+import { fetcher } from "../api";
 import { usePeek, type EntityRef } from "./PeekContext";
 import { Markdown } from "./Markdown";
 import { EntityLink } from "./EntityLink";
 import { Linkified } from "./Linkified";
 import { Phylactery } from "./Phylactery";
-
-const OBSERVER_URL =
-  (import.meta.env?.VITE_OBSERVER_URL as string | undefined) ??
-  "http://localhost:8000";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 /** Top of the peek stack opens a Radix Dialog as a side drawer. The
  * stack lets users traverse chains; the back arrow pops back. */
@@ -95,9 +90,9 @@ function PeekBody({ ref }: { ref: EntityRef }) {
 }
 
 function PodPeek({ podId }: { podId: string }) {
-  const { data: pods } = useSWR<any[]>(`${OBSERVER_URL}/state/pods`, fetcher);
+  const { data: pods } = useSWR<any[]>(`/state/pods`, fetcher);
   const { data: charter } = useSWR<any>(
-    `${OBSERVER_URL}/state/pods/${podId}/charter`,
+    `/state/pods/${podId}/charter`,
     fetcher,
   );
   const pod = pods?.find((p) => p.pod_id === podId);
@@ -123,7 +118,7 @@ function PodPeek({ podId }: { podId: string }) {
 }
 
 function ProclamationPeek({ seq }: { seq: string }) {
-  const { data } = useSWR<any[]>(`${OBSERVER_URL}/state/proclamations`, fetcher);
+  const { data } = useSWR<any[]>(`/state/proclamations`, fetcher);
   const proc = data?.find((p) => String(p.seq) === seq);
   if (!proc) return <Text color="gray">Proclamation not found.</Text>;
   return (
@@ -142,7 +137,7 @@ function ProclamationPeek({ seq }: { seq: string }) {
 }
 
 function DecisionPeek({ decisionId }: { decisionId: string }) {
-  const { data } = useSWR<any[]>(`${OBSERVER_URL}/state/decisions`, fetcher);
+  const { data } = useSWR<any[]>(`/state/decisions`, fetcher);
   const d = data?.find((r) => r.decision_id === decisionId);
   if (!d) return <Text color="gray">Decision not found.</Text>;
   return (
@@ -164,7 +159,7 @@ function DecisionPeek({ decisionId }: { decisionId: string }) {
 }
 
 function ProposalPeek({ proposalId }: { proposalId: string }) {
-  const { data } = useSWR<any[]>(`${OBSERVER_URL}/state/proposals`, fetcher);
+  const { data } = useSWR<any[]>(`/state/proposals`, fetcher);
   const p = data?.find((r) => r.proposal_id === proposalId);
   if (!p) return <Text color="gray">Proposal not found.</Text>;
   return (
@@ -181,9 +176,9 @@ function ProposalPeek({ proposalId }: { proposalId: string }) {
 }
 
 function CouncilPeek({ councilId }: { councilId: string }) {
-  const { data: councils } = useSWR<any[]>(`${OBSERVER_URL}/state/councils`, fetcher);
+  const { data: councils } = useSWR<any[]>(`/state/councils`, fetcher);
   const { data: msgs } = useSWR<any[]>(
-    `${OBSERVER_URL}/state/councils/${councilId}/messages`,
+    `/state/councils/${councilId}/messages`,
     fetcher,
   );
   const c = councils?.find((r) => r.council_id === councilId);

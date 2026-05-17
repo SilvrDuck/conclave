@@ -3,13 +3,8 @@ import { Cross1Icon } from "@radix-ui/react-icons";
 import { Box, Flex, IconButton, Text } from "@radix-ui/themes";
 import { useEffect, useState } from "react";
 import useSWR from "swr";
+import { fetcher } from "../api";
 import { Markdown } from "./Markdown";
-
-const OBSERVER_URL =
-  (import.meta.env?.VITE_OBSERVER_URL as string | undefined) ??
-  "http://localhost:8000";
-
-const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 const ABOUT_BODY = `# About this conclave
 
@@ -108,7 +103,7 @@ export function SpecDialog() {
     return () => window.removeEventListener("conclave:open-spec", onOpenSpec);
   }, []);
   const { data } = useSWR<SpecPage | { detail: string }>(
-    open ? `${OBSERVER_URL}/state/spec/${selected}` : null,
+    open ? `/state/spec/${selected}` : null,
     fetcher,
   );
   return (
