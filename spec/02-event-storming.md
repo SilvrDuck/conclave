@@ -185,10 +185,10 @@ A pod's API breaks. Downstream pods must agree before it ships.
 
 | | |
 |---|---|
-| 🟣 policy | on `EndpointObserved` for a *changed* endpoint → `IdentifyCallers(endpoint)` |
-| 🔵 command | `ProposeContractChange(endpoints, rationale, strategy=consensus_omnium)` |
+| 🟣 policy | on `EndpointObserved` → `IdentifyCallers(endpoint)`; if the pod already has callers, emit `EndpointContractChanged(pod_id, method, path, callers)` (observer reactor) |
+| 🟣 policy | on `EndpointContractChanged` → mcp-coms auto-`ConveneCouncil(topic="shape of new contract on <pod>: <method> <path>", participants=[pod_id, *callers])` |
+| 🔵 command | `ProposeContractChange(endpoints, rationale, strategy=consensus_omnium)` — opened by the pod once the council closes |
 | 🟠 events | `ProposalOpened(kind=contract_change, affected=[callers])` |
-| 🟣 policy | callers may `ConveneCouncil(topic="shape of new contract")` before balloting |
 | 🟠 events | `BallotCast` · `ProposalClosed(outcome)` |
 | 🟣 policy | on `outcome=approved` → `SealDecision`; pod ships |
 | 🟣 policy | on `outcome=rejected` → pod must converge (back to council) |

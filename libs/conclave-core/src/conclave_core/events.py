@@ -223,6 +223,19 @@ class EndpointAnnotated(DomainEvent):
     body: str
 
 
+class EndpointContractChanged(DomainEvent):
+    """Spec/02 Phase 6 — IdentifyCallers policy fires when a pod's API
+    surface expands while it already has callers. The platform tells
+    the callers so they can convene a council *before* the contract
+    is balloted. This is the IdentifyCallers result, materialised."""
+
+    event_type: Literal["EndpointContractChanged"] = "EndpointContractChanged"
+    pod_id: str
+    method: str
+    path: str
+    callers: list[str]
+
+
 class PodMarkedStuck(DomainEvent):
     event_type: Literal["PodMarkedStuck"] = "PodMarkedStuck"
     pod_id: str

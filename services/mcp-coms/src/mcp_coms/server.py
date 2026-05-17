@@ -40,10 +40,43 @@ async def lifespan(server: FastMCP):
                 except Exception:
                     log.exception("SendDirectMessage cmd handler failed")
 
+            async def on_contract_change(data: dict[str, Any]) -> None:
+                """Spec/02 Phase 6 — callers may convene a council
+                ('shape of new contract') before balloting. We open
+                that council automatically with the affected pod +
+                its callers as participants."""
+                try:
+                    pod_id = data["pod_id"]
+                    method = data["method"]
+                    path = data["path"]
+                    callers = list(data.get("callers") or [])
+                    participants = sorted(set([pod_id, *callers]))
+                    if len(participants) < 2:
+                        return
+                    topic = (
+                        f"Shape of new contract on {pod_id}: "
+                        f"{method} {path}"
+                    )
+                    await service.convene_council(
+                        topic=topic,
+                        participants=participants,
+                        private=False,
+                        needs_augustus=False,
+                    )
+                except Exception:
+                    log.exception(
+                        "EndpointContractChanged reactor failed for %s", data
+                    )
+
             await bus.subscribe(
                 "conclave.commands.council.SendDirectMessage",
                 on_send_dm_cmd,
                 durable="mcp-coms-dm",
+            )
+            await bus.subscribe(
+                "conclave.events.observer.EndpointContractChanged",
+                on_contract_change,
+                durable="mcp-coms-identify-callers",
             )
             yield {"service": service}
 
