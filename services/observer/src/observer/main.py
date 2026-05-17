@@ -53,9 +53,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         )
         app.state.observer = app_state
 
-        # In-process services
+        # In-process services. Operator is hung on app.state so the
+        # /commands route reuses the lifespan-built instance instead
+        # of constructing a fresh one per request (kanban #25).
         operator = OperatorService(pool=pool, bus=bus)
         observation = ObservationService(pool=pool, broadcaster=broadcaster)
+        app.state.operator = operator
 
         # Wire bus subscribers
         await operator.start()

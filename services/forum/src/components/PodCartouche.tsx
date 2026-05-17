@@ -97,6 +97,24 @@ export function PodCartouche({ pod, sparkline, simulator, compact }: Props) {
       >
         {role}
       </span>
+      {/* Tiny ornament distinguishes code-pod (✶) from adopted (◈)
+       * — kanban #55. Same Cinzel typography; pure character data,
+       * no new colour. */}
+      {!compact ? (
+        <span
+          aria-hidden
+          title={pod.image_strategy === "adopted" ? "adopted pod" : "code pod"}
+          style={{
+            marginLeft: 6,
+            fontFamily: "var(--f-display)",
+            fontSize: 11,
+            color: C.inkFaded,
+            verticalAlign: "middle",
+          }}
+        >
+          {pod.image_strategy === "adopted" ? "◈" : "✶"}
+        </span>
+      ) : null}
       {!compact && sparkline && sparkline.length > 1 ? (
         <Sparkline values={sparkline} />
       ) : null}
