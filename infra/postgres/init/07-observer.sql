@@ -70,3 +70,12 @@ CREATE TABLE IF NOT EXISTS agent_turns (
     tokens_out   INT,
     PRIMARY KEY (pod_id, turn_id)
 );
+
+-- Performance indexes (kanban #22). Without these:
+--   - pod_state.last_seen scans are O(N pods) per HealthWatcher tick
+--   - calls.observed_at scans the whole table for the live-graph view
+--   - agent_turns(pod_id, started_at DESC) backs the Thinking tab
+CREATE INDEX IF NOT EXISTS pod_state_last_seen_idx
+    ON pod_state(last_seen DESC);
+CREATE INDEX IF NOT EXISTS agent_turns_pod_started_idx
+    ON agent_turns(pod_id, started_at DESC);

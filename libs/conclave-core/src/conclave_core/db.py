@@ -15,9 +15,18 @@ import asyncpg
 
 
 def database_url() -> str:
-    return os.environ.get(
-        "DATABASE_URL",
-        "postgres://conclave:conclave@localhost:5432/conclave",
+    """Return the configured DATABASE_URL. Falls back to the
+    localhost dev DSN only when CONCLAVE_DEV_DEFAULT_DB is set.
+    Production-shaped services should crash on a missing URL rather
+    than silently connecting to a wrong instance."""
+    explicit = os.environ.get("DATABASE_URL")
+    if explicit:
+        return explicit
+    if os.environ.get("CONCLAVE_DEV_DEFAULT_DB"):
+        return "postgres://conclave:conclave@localhost:5432/conclave"
+    raise RuntimeError(
+        "DATABASE_URL not set. Export it explicitly, or set "
+        "CONCLAVE_DEV_DEFAULT_DB=1 to use the local dev DSN."
     )
 
 
