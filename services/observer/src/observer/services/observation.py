@@ -101,11 +101,24 @@ class ObservationService:
                     main_image=data.get("image") if data.get("mode") == "adopted" else None,
                 )
             case "PodAdmitted":
+                # UPSERT: an admission of a not-yet-spawned pod (the
+                # simulator proposing peer pods like `rider-app`)
+                # never had a PodContainerStarted, so observer.pod_state
+                # has no row yet. INSERT placeholder so Glance renders
+                # all 5+ pods. runtime_status='not_yet_spawned' until
+                # the container actually starts.
                 async with self._pool.acquire() as conn:
                     await conn.execute(
-                        """UPDATE observer.pod_state SET admitted = TRUE,
-                              display_role = $2, last_seen = now()
-                              WHERE pod_id = $1""",
+                        """INSERT INTO observer.pod_state
+                                   (pod_id, display_role, image_strategy,
+                                    runtime_status, agent_state, admitted,
+                                    last_seen)
+                            VALUES ($1, $2, 'code', 'not_yet_spawned',
+                                    'idle', TRUE, now())
+                            ON CONFLICT (pod_id) DO UPDATE
+                                SET admitted = TRUE,
+                                    display_role = EXCLUDED.display_role,
+                                    last_seen = now()""",
                         data["pod_id"],
                         data["display_role"],
                     )
