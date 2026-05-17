@@ -29,6 +29,9 @@ infra/traefik/dynamic/*.yml
 !infra/traefik/dynamic/.gitkeep
 infra/data/
 
+# runtime pod renders (templates stay tracked)
+pods/pod-*/
+
 # logs
 *.log
 *.tsbuildinfo
