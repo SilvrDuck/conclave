@@ -418,7 +418,16 @@ async def agent_loop(pod_id: str, display_role: str) -> None:
 
     while True:
         subject, data = await queue.get()
-        kind = subject.rsplit(".", 1)[-1]
+        # Derive the prompt header from the payload's event_type when
+        # present (works for both JetStream-published domain events
+        # and our hand-formatted inbox MembershipChange /
+        # RequestAnnotation). Fall back to the subject suffix only
+        # when the payload doesn't carry the event_type tag.
+        kind = (
+            data.get("event_type")
+            if isinstance(data, dict) and data.get("event_type")
+            else subject.rsplit(".", 1)[-1]
+        )
         try:
             prompt = _build_prompt(pod_id, display_role, kind, data)
             await _run_claude(pod_id, prompt)

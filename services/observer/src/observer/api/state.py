@@ -25,6 +25,9 @@ _POD_ID_RE = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 _SPEC_NAME_RE = re.compile(r"^[a-zA-Z0-9_.-]+\.md$")
 # Cap workspace file listing so a runaway pod can't OOM the Forum.
 _MAX_WORKSPACE_ENTRIES = 500
+# Cap on the file-content reads (charter / spec). 1 MiB is overkill
+# for any sane markdown; larger means a bug or a hostile file.
+_MAX_FILE_READ_BYTES = 1024 * 1024
 
 
 @router.get("/pods")
@@ -287,6 +290,31 @@ def _validate_pod_id(pod_id: str) -> None:
         raise HTTPException(status_code=400, detail="invalid pod_id format")
 
 
+def _ensure_under_project_dir(p: Path) -> Path:
+    """Resolve `p` and reject paths that escape the project root.
+    The regex guards on pod_id and filename already block traversal,
+    but defence in depth costs nothing: a symlink farm in
+    pods/<id>/ could otherwise smuggle reads."""
+    resolved = p.resolve()
+    project = _PROJECT_DIR.resolve()
+    try:
+        resolved.relative_to(project)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail="path escapes project root") from e
+    return resolved
+
+
+def _check_file_size(p: Path) -> int:
+    """Enforce the read cap so a runaway file can't OOM the Forum."""
+    size = p.stat().st_size
+    if size > _MAX_FILE_READ_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"file too large ({size} > {_MAX_FILE_READ_BYTES})",
+        )
+    return size
+
+
 @router.get("/pods/{pod_id}/charter")
 async def get_pod_charter(pod_id: str) -> dict[str, Any]:
     """Read the pod's charter.md from disk so the Forum charter editor
@@ -294,16 +322,19 @@ async def get_pod_charter(pod_id: str) -> dict[str, Any]:
     the tabs. The charter is mounted RO into the pod and written
     on-host; observer mirrors the host view."""
     _validate_pod_id(pod_id)
-    charter = _PROJECT_DIR / "pods" / pod_id / "charter.md"
+    charter = _ensure_under_project_dir(
+        _PROJECT_DIR / "pods" / pod_id / "charter.md"
+    )
     if not charter.is_file():
         raise HTTPException(status_code=404, detail="charter not found")
+    size = _check_file_size(charter)
     body = charter.read_text(encoding="utf-8")
     stat = charter.stat()
     return {
         "pod_id": pod_id,
         "path": str(charter.relative_to(_PROJECT_DIR)),
         "body": body,
-        "size": stat.st_size,
+        "size": size,
         "mtime": datetime.fromtimestamp(stat.st_mtime, tz=UTC).isoformat(),
     }
 
@@ -384,13 +415,14 @@ async def get_spec_file(filename: str) -> dict[str, Any]:
     path components) to defeat traversal."""
     if not _SPEC_NAME_RE.match(filename):
         raise HTTPException(status_code=400, detail="invalid spec filename")
-    spec_path = _PROJECT_DIR / "spec" / filename
+    spec_path = _ensure_under_project_dir(_PROJECT_DIR / "spec" / filename)
     if not spec_path.is_file():
         raise HTTPException(status_code=404, detail="spec file not found")
+    size = _check_file_size(spec_path)
     body = spec_path.read_text(encoding="utf-8")
     return {
         "filename": filename,
         "path": str(spec_path.relative_to(_PROJECT_DIR)),
         "body": body,
-        "size": spec_path.stat().st_size,
+        "size": size,
     }

@@ -87,14 +87,14 @@ class PodsService:
         async with self._pool.acquire() as conn:
             row = await conn.fetchrow(
                 """WITH before AS (
-                       SELECT display_role AS old_role FROM pods.pods
+                       SELECT display_role AS old_role, admitted FROM pods.pods
                         WHERE pod_id = $1 FOR UPDATE
                    ), upd AS (
                        UPDATE pods.pods SET display_role = $2
                         WHERE pod_id = $1
                         RETURNING pod_id
                    )
-                   SELECT before.old_role FROM before, upd""",
+                   SELECT before.old_role, before.admitted FROM before, upd""",
                 pod_id,
                 new_display_role,
             )
@@ -111,6 +111,19 @@ class PodsService:
         log.info(
             "PodRenamed %s: %r -> %r", pod_id, row["old_role"], new_display_role
         )
+        # Rewrite the Traefik rule so <new_role>.conclave.local routes
+        # to the same backend. Only admitted pods have rules to begin
+        # with — non-admitted candidates don't have a hostname yet.
+        if row["admitted"]:
+            try:
+                write_rule(
+                    dynamic_dir=traefik_dynamic_dir(),
+                    pod_id=pod_id,
+                    display_role=new_display_role,
+                    service_port=DEFAULT_SERVICE_PORT,
+                )
+            except OSError:
+                log.exception("failed to rewrite Traefik rule for renamed %s", pod_id)
 
     # ─── reactors (consume events from senate, observer) ────────────────
 
