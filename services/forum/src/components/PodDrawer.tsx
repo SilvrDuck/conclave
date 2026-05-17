@@ -90,24 +90,52 @@ function PodInside({ podId }: { podId: string }) {
   const outboundCalls = (calls ?? []).filter((c) => c.src_pod === podId);
   const charterBody = charter && "body" in charter ? charter.body : "";
 
+  const [restartBusy, setRestartBusy] = useState(false);
+  const restart = async () => {
+    if (restartBusy) return;
+    if (!window.confirm(`Restart pod ${podId}? The container will be recreated; the agent resumes on the next inbox event.`))
+      return;
+    setRestartBusy(true);
+    try {
+      await postCommand({ kind: "RestartPod", pod_id: podId });
+    } finally {
+      setRestartBusy(false);
+    }
+  };
+
   return (
     <Flex direction="column" className="h-full">
       <Box className="pb-3">
-        <Heading size="4">{pod?.display_role ?? podId}</Heading>
-        <Flex gap="2" mt="1" wrap="wrap">
-          <Badge color="gray">{podId}</Badge>
-          {pod && (
-            <>
-              <Badge color={pod.admitted ? "green" : "gray"}>
-                {pod.admitted ? "admitted" : "candidate"}
-              </Badge>
-              <Badge>{pod.image_strategy}</Badge>
-              <Badge color={pod.agent_state === "thinking" ? "amber" : "gray"}>
-                {pod.agent_state}
-              </Badge>
-              {pod.main_image && <Badge color="amber">{pod.main_image}</Badge>}
-            </>
-          )}
+        <Flex justify="between" align="start" gap="3">
+          <Box>
+            <Heading size="4">{pod?.display_role ?? podId}</Heading>
+            <Flex gap="2" mt="1" wrap="wrap">
+              <Badge color="gray">{podId}</Badge>
+              {pod && (
+                <>
+                  <Badge color={pod.admitted ? "green" : "gray"}>
+                    {pod.admitted ? "admitted" : "candidate"}
+                  </Badge>
+                  <Badge>{pod.image_strategy}</Badge>
+                  <Badge color={pod.agent_state === "thinking" ? "amber" : "gray"}>
+                    {pod.agent_state}
+                  </Badge>
+                  {pod.main_image && <Badge color="amber">{pod.main_image}</Badge>}
+                </>
+              )}
+            </Flex>
+          </Box>
+          {/* ATAM Op4 — Restart pod. Confirms before firing so an
+            accidental click can't kill a thinking agent. */}
+          <Button
+            size="1"
+            variant="soft"
+            color="orange"
+            onClick={restart}
+            disabled={restartBusy || !pod}
+          >
+            {restartBusy ? "restarting…" : "Restart"}
+          </Button>
         </Flex>
       </Box>
 

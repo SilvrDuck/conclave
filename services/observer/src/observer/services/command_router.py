@@ -42,11 +42,22 @@ class CastBallotPayload(BaseModel):
     comment: str | None = None
 
 
+class RestartPodPayload(BaseModel):
+    """ATAM Op4 — Augustus restarts a pod that's stuck or
+    misbehaving without exiling it. Implemented as `docker restart
+    conclave-<pod_id>` on the host daemon via mcp-pods."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["RestartPod"] = "RestartPod"
+    pod_id: str = Field(min_length=1)
+
+
 ValidatedCommand = (
     IssueProclamationPayload
     | SendDirectMessagePayload
     | EditCharterPayload
     | CastBallotPayload
+    | RestartPodPayload
 )
 
 

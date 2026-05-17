@@ -52,6 +52,9 @@ async def lifespan(server: FastMCP):
             async def on_pod_admitted(data: dict[str, Any]) -> None:
                 await service.on_pod_admitted(data)
 
+            async def on_restart_pod(data: dict[str, Any]) -> None:
+                await service.on_restart_pod(data)
+
             await bus.subscribe(
                 "conclave.events.senate.ProposalClosed",
                 on_proposal_closed,
@@ -71,6 +74,11 @@ async def lifespan(server: FastMCP):
                 "conclave.events.pods.PodAdmitted",
                 on_pod_admitted,
                 durable="mcp-pods-broadcast-membership",
+            )
+            await bus.subscribe(
+                "conclave.commands.pods.RestartPod",
+                on_restart_pod,
+                durable="mcp-pods-restart",
             )
             yield {"service": service}
 

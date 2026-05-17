@@ -55,6 +55,8 @@ class OperatorService:
                 await self._bus.publish_command("EditCharter", payload, "pods")
             case "CastBallot":
                 await self._bus.publish_command("CastBallot", payload, "senate")
+            case "RestartPod":
+                await self._bus.publish_command("RestartPod", payload, "pods")
             case _:
                 raise ValueError(f"unknown Forum command kind: {kind}")
 
