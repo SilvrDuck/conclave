@@ -240,6 +240,10 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
     first run for `--resume` on subsequent turns."""
     global _session_id
     system_path = _compose_system_prompt()
+    # --add-dir takes a variadic list (`<directories...>`), so any
+    # positional arg that follows it is slurped as another directory
+    # — including the prompt. Pipe the prompt via stdin instead so
+    # the CLI's argv parser can't confuse it. (Discovered pass-3.)
     cmd = [
         CLAUDE_BIN,
         "--print",
@@ -259,7 +263,6 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
     ]
     if _session_id:
         cmd += ["--resume", _session_id]
-    cmd += [prompt]
 
     turn_id = secrets.token_hex(6)
     log.info("agent turn %s starting (session=%s)", turn_id, _session_id or "new")
@@ -290,9 +293,14 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
     proc = await asyncio.create_subprocess_exec(
         *cmd,
         cwd=str(WORKSPACE_DIR),
+        stdin=asyncio.subprocess.PIPE,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
+    assert proc.stdin is not None
+    proc.stdin.write(prompt.encode())
+    await proc.stdin.drain()
+    proc.stdin.close()
 
     async def pump_stdout() -> None:
         global _session_id
