@@ -245,7 +245,12 @@ class PodMarkedStuck(DomainEvent):
 class PodHealthChanged(DomainEvent):
     event_type: Literal["PodHealthChanged"] = "PodHealthChanged"
     pod_id: str
-    runtime_status: PodRuntimeStatus
+    # Both fields are optional so emitters can carry just the
+    # dimension they're authoritative about. DockerEventsWatcher
+    # sets runtime_status (container exit/start). HealthWatcher
+    # sets agent_state (span staleness → idle). The projection
+    # COALESCEs over the current row's value.
+    runtime_status: PodRuntimeStatus | None = None
     agent_state: AgentState | None = None
 
 

@@ -137,11 +137,12 @@ class ObservationService:
                 async with self._pool.acquire() as conn:
                     await conn.execute(
                         """UPDATE observer.pod_state
-                              SET runtime_status = $2, agent_state = COALESCE($3, agent_state),
+                              SET runtime_status = COALESCE($2, runtime_status),
+                                  agent_state = COALESCE($3, agent_state),
                                   last_seen = now()
                               WHERE pod_id = $1""",
                         data["pod_id"],
-                        data["runtime_status"],
+                        data.get("runtime_status"),
                         data.get("agent_state"),
                     )
             case "PodMarkedStuck":
