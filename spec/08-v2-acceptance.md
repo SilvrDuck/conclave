@@ -375,11 +375,19 @@ Each pass of the loop:
      or "TODO later." File each as a kanban task before the next
      pass starts.
 
-3. **Nuke.** `bash teardown.sh`, remove the `postgres_data`,
-   `nats_data`, `tempo_data` volumes, and prune any leftover
-   `conclave-*` containers. The next pass starts on a fresh
-   machine state. The `runs/<YYYY-MM-scenario>/` notes are kept
-   in git.
+3. **Nuke.** `bash nuke.sh` — single canonical script that takes
+   the stack down with `-v` (postgres / nats / tempo volumes),
+   kills any straggler `conclave-pod-*` containers, and removes
+   every rendered `pods/pod-*/` directory. It must work without
+   sudo. Two ownership layers are at play: mcp-pods chowns rendered
+   dirs back to `HOST_UID:HOST_GID` at spawn time so the shell is
+   host-owned, but the pod container itself runs as root and the
+   files it writes (`workspace/…`, edits to `charter.md`) end up
+   root-owned on the host. `nuke.sh` therefore tries a plain
+   `rm -rf` first and falls back to an `alpine:3` sidecar (also
+   root) when the runtime writes block removal — both paths leave
+   the next pass on a fresh machine state.
+   `runs/<YYYY-MM-scenario>/` notes are kept in git.
 
 The loop terminates when an analyze phase files zero new tasks. At
 that point v2 is done.

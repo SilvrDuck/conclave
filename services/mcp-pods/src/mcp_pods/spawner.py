@@ -55,6 +55,55 @@ def _host_env() -> dict[str, str]:
     }
 
 
+def _chown_to_host(path: Path) -> None:
+    """Recursively chown `path` to HOST_UID:HOST_GID. mcp-pods runs as
+    root inside its container, so without this every rendered file is
+    owned by root on the host and `rm -rf` from the loop fails.
+
+    Note: this only chowns the rendered shell (template files + compose
+    snippet). The pod container itself runs as root and writes to
+    `workspace/` + `charter.md` at runtime — those files end up
+    root-owned again. The canonical workaround is nuke.sh's docker
+    fallback. Running the pod as host UID is the principled fix (filed
+    as a backlog task)."""
+    raw_uid = os.environ.get("HOST_UID")
+    raw_gid = os.environ.get("HOST_GID")
+    if raw_uid is None or raw_gid is None:
+        log.warning("HOST_UID/HOST_GID not set; skipping chown of %s", path)
+        return
+    try:
+        uid = int(raw_uid)
+        gid = int(raw_gid)
+    except ValueError:
+        log.warning(
+            "HOST_UID=%r HOST_GID=%r not integers; skipping chown of %s",
+            raw_uid,
+            raw_gid,
+            path,
+        )
+        return
+    if uid == 0 and gid == 0:
+        # Defaults to 0/0 when compose's `${HOST_UID:-0}` fallback fires
+        # because kickstart didn't export them. The legitimate case is a
+        # genuine root host user, which is rare. Warn instead of silently
+        # rendering a root-owned tree.
+        log.warning(
+            "HOST_UID and HOST_GID are both 0 — kickstart may not have "
+            "exported them. Rendering %s without chown; nuke.sh's docker "
+            "fallback will handle removal.",
+            path,
+        )
+        return
+    # follow_symlinks=False so a hostile/buggy template can't ever redirect
+    # the chown out of the tree.
+    os.chown(path, uid, gid, follow_symlinks=False)
+    for root, dirs, files in os.walk(path):
+        for name in dirs + files:
+            os.chown(
+                os.path.join(root, name), uid, gid, follow_symlinks=False
+            )
+
+
 def render_pod_dir(pod_id: str, display_role: str) -> Path:
     """Copy pods/_template -> pods/<pod_id>/ and render the compose
     snippet. Idempotent: returns the existing dir if it's already there.
@@ -81,6 +130,7 @@ def render_pod_dir(pod_id: str, display_role: str) -> Path:
     )
     out_path.write_text(rendered)
     log.info("rendered %s", out_path)
+    _chown_to_host(pod_dir)
     return pod_dir
 
 

@@ -41,6 +41,11 @@ ensure_host_entry api.conclave.local
 export HOST_PROJECT_DIR="${REPO_ROOT}"
 export HOST_CLAUDE_CREDENTIALS="${HOME}/.claude/.credentials.json"
 export HOST_CLAUDE_VERSIONS="${HOME}/.local/share/claude/versions"
+# So mcp-pods can chown rendered pod dirs back to the host user; without
+# this, copytree() runs as root inside the mcp-pods container and the
+# files end up owned by root on the host, blocking `rm -rf` from the loop.
+export HOST_UID="$(id -u)"
+export HOST_GID="$(id -g)"
 
 blue "starting conclave platform (this may take a minute on first build)"
 docker compose -f "${COMPOSE_FILE}" --profile conclave up -d --build

@@ -234,6 +234,10 @@ services:
       HOST_PROJECT_DIR: ${HOST_PROJECT_DIR:-}
       HOST_CLAUDE_CREDENTIALS: ${HOST_CLAUDE_CREDENTIALS:-}
       HOST_CLAUDE_VERSIONS: ${HOST_CLAUDE_VERSIONS:-}
+      # mcp-pods chowns rendered pods/<id>/ to these so the host user
+      # can `rm -rf` between realize → analyze → nuke passes without sudo.
+      HOST_UID: ${HOST_UID:-0}
+      HOST_GID: ${HOST_GID:-0}
     depends_on:
       postgres:
         condition: service_healthy
