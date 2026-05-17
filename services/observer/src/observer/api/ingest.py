@@ -14,6 +14,7 @@ from typing import Any
 
 from conclave_core.events import EndpointObserved
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import Response
 
 from observer.otel_acl import translate_traces_request
 
@@ -114,3 +115,20 @@ async def ingest_otel(request: Request) -> dict[str, int]:
             log.exception("EndpointObserved publish failed for %s %s %s",
                           pod_id, method, path)
     return {"calls": len(calls), "endpoints": len(endpoints)}
+
+
+# Catch-all for legacy/unknown ingest paths. Some stale dev client
+# was POSTing /ingest/pod-activity at ~10/s on pass-2; observer logs
+# spammed 404s. Accept-and-drop with a 204 and a single warning log
+# per unique path so noise is bounded. Registered AFTER specific
+# routes so FastAPI matches them first. (G20)
+_warned_paths: set[str] = set()
+
+
+@router.post("/{rest:path}")
+async def ingest_catchall(rest: str, request: Request) -> Response:
+    full_path = request.url.path
+    if full_path not in _warned_paths:
+        log.warning("ingest catch-all: unknown path %s (suppressing further)", full_path)
+        _warned_paths.add(full_path)
+    return Response(status_code=204)
