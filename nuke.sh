@@ -37,15 +37,17 @@ if [[ -n "${stragglers}" ]]; then
 fi
 
 blue "removing rendered pod dirs (pods/pod-*)"
-# Fallback path: if HOST_UID propagation regressed and dirs are root-owned,
-# spawn an alpine container running as root to remove them.
+# Two ownership layers: mcp-pods chowns the rendered shell to the host
+# user at spawn time, but the pod container itself runs as root and the
+# files it writes at runtime (workspace, charter edits) end up root-owned.
+# Try a plain rm first; on failure spawn an alpine:3 sidecar as root.
 shopt -s nullglob
 rendered=("${REPO_ROOT}"/pods/pod-*)
 shopt -u nullglob
 if [[ ${#rendered[@]} -gt 0 ]]; then
     if ! rm -rf "${rendered[@]}" 2>/dev/null; then
-        blue "  (need docker fallback — pod dirs are root-owned)"
-        docker run --rm -v "${REPO_ROOT}/pods:/p" alpine sh -c 'rm -rf /p/pod-*'
+        blue "  (docker fallback — pod writes are root-owned)"
+        docker run --rm -v "${REPO_ROOT}/pods:/p" alpine:3 sh -c 'rm -rf /p/pod-*'
     fi
 fi
 
