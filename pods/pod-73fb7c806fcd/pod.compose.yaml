@@ -1,0 +1,37 @@
+# Per-pod compose override. Rendered by mcp-pods's spawner with
+# pod-73fb7c806fcd, tbd, /home/thibault/code/conclave, ${HOST_CLAUDE_*}
+# substituted before invocation. The platform brings this up via
+# `docker compose -f infra/compose.yaml -f pods/<id>/pod.compose.yaml
+#  --profile pod-<id> up -d` issued from /home/thibault/code/conclave.
+#
+# The service name == pod-73fb7c806fcd so docker DNS resolves <id> within the
+# conclave network. Traefik rule is written separately by mcp-pods once
+# admission seals.
+#
+# Image: prebuilt `conclave/pod-template:latest` (mcp-pods builds it
+# on startup so the first spawn doesn't pay the build cost). Per-pod
+# state (charter.md, workspace/) bind-mounts in so the swarm's edits
+# survive container restarts and are visible to the Forum.
+
+services:
+  pod-73fb7c806fcd:
+    profiles: ["pod-pod-73fb7c806fcd"]
+    image: conclave/pod-template:latest
+    container_name: conclave-pod-73fb7c806fcd
+    restart: unless-stopped
+    networks: [conclave]
+    environment:
+      POD_ID: pod-73fb7c806fcd
+      DISPLAY_ROLE: tbd
+      OTEL_SERVICE_NAME: pod-73fb7c806fcd
+      MCP_PODS_URL: http://mcp-pods:8000/mcp
+      NATS_URL: nats://nats:4222
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      ENABLE_AGENT: "true"
+      CLAUDE_MODEL: ${CLAUDE_MODEL:-haiku}
+      CLAUDE_EFFORT: ${CLAUDE_EFFORT:-low}
+    volumes:
+      - /home/thibault/code/conclave/pods/pod-73fb7c806fcd/workspace:/pod/workspace
+      - /home/thibault/code/conclave/pods/pod-73fb7c806fcd/charter.md:/pod/charter.md
+      - /home/thibault/.local/share/claude/versions:/opt/claude:ro
+      - /home/thibault/.claude/.credentials.json:/root/.claude/.credentials.json:ro
