@@ -30,7 +30,14 @@ pods/<pod-id>/                  (copied from this template)
 - **Main** (the OSS image) is the actual service. It runs as the image
   intends. No agent code inside.
 - **Sidecar** mounts:
-  - `/var/run/docker.sock` (read+write) — to `docker exec` into main.
+  - **NOT** the raw `/var/run/docker.sock`. Instead, a per-pod
+    `tecnativa/docker-socket-proxy` sits in front of the socket with
+    a `CONTAINER_NAME_FILTER=^pod-<role>$$` regex. The sidecar reaches
+    docker via `DOCKER_HOST=tcp://pod-<role>-docker-proxy:2375`,
+    which restricts the API surface to its own container only
+    (CONTAINERS=1 + EXEC=1 + POST=1, everything else 0). Spec/07-c4
+    + ATAM risk 153 + kanban #32 mandate this scoping before any
+    adopted pod is given an agent.
   - A named volume shared with main where the agent can drop config
     files the OSS service rereads (postgres `pg_hba.conf` etc.).
   - Read-only `/pod/charter.md`.

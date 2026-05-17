@@ -6,6 +6,13 @@
 # `container_name: pod-${ROLE}` need a real edit, not a runtime env.
 #
 # Pick a distinct host port if exposing.
+#
+# Per kanban #32 / ATAM risk 153 / spec 07-c4: the sidecar agent is NOT
+# given /var/run/docker.sock host-wide. It talks to a per-pod
+# tecnativa/docker-socket-proxy whose CONTAINERS env restricts the
+# accessible container set to the main pod-${ROLE} container only.
+# This makes a compromised sidecar unable to inspect / kill / exec
+# arbitrary host containers — only its own.
 
 x-adopted-pod-template: &adopted-pod-template
   profiles: ["pod-${ROLE}"]
@@ -18,6 +25,26 @@ services:
     image: ${IMAGE}                # e.g. postgres:16 / meilisearch:1.10
     container_name: pod-${ROLE}
     # ports / env / volumes per the upstream image's docs
+
+  ${ROLE}-docker-proxy:
+    <<: *adopted-pod-template
+    image: tecnativa/docker-socket-proxy:0.3
+    container_name: pod-${ROLE}-docker-proxy
+    environment:
+      # CONTAINERS=1 grants the sidecar list/inspect/start/stop ONLY.
+      # POST=1 lets it call exec/restart for management. Every other
+      # endpoint (BUILD, IMAGES, NETWORKS, SECRETS, …) stays 0.
+      CONTAINERS: "1"
+      POST: "1"
+      EXEC: "1"
+      # Whitelist by container name (regex). With this set the proxy
+      # also returns 403 for any container lookup that doesn't match,
+      # so even if the sidecar lists / inspects, it sees only its own.
+      CONTAINER_NAME_FILTER: "^pod-${ROLE}$$"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt:
+      - "no-new-privileges:true"
 
   ${ROLE}-sidecar:
     <<: *adopted-pod-template
@@ -32,7 +59,10 @@ services:
       MCP_PODS_URL: http://mcp-pods:8000/mcp
       OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
       ENABLE_AGENT: "false"
+      # Sidecar talks to the per-pod proxy, NOT the host docker socket.
+      # The docker SDK / CLI honours DOCKER_HOST so no code change in
+      # the sidecar.
+      DOCKER_HOST: "tcp://pod-${ROLE}-docker-proxy:2375"
     depends_on:
       - ${ROLE}
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - ${ROLE}-docker-proxy
