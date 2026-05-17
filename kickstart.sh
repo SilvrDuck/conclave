@@ -24,15 +24,32 @@ docker compose version >/dev/null 2>&1 \
     || { red "docker compose plugin not found (need v2)"; exit 1; }
 
 # ── 2. hostnames ────────────────────────────────────────────────────────
+# Pretty URLs (forum.conclave.local, api.conclave.local) require
+# /etc/hosts entries. Asking for sudo non-interactively hangs, so we
+# only attempt the edit when we have a TTY *and* the entries are
+# missing. Without them, the Forum still works at the localhost
+# ports printed in §4 — no functional regression, just plainer URLs.
+HOSTS_OK=1
 ensure_host_entry() {
     local host="$1"
-    if ! grep -qE "^[^#]*\b${host}\b" /etc/hosts 2>/dev/null; then
-        blue "adding 127.0.0.1 ${host} to /etc/hosts (sudo required)"
-        echo "127.0.0.1 ${host}" | sudo tee -a /etc/hosts >/dev/null
+    if grep -qE "^[^#]*\b${host}\b" /etc/hosts 2>/dev/null; then
+        return 0
     fi
+    if [[ -t 0 ]] && [[ -t 1 ]]; then
+        blue "adding 127.0.0.1 ${host} to /etc/hosts (sudo required)"
+        if echo "127.0.0.1 ${host}" | sudo tee -a /etc/hosts >/dev/null; then
+            return 0
+        fi
+    fi
+    HOSTS_OK=0
 }
 ensure_host_entry forum.conclave.local
 ensure_host_entry api.conclave.local
+if [[ "${HOSTS_OK}" == 0 ]]; then
+    blue "skipped /etc/hosts edit (no TTY or sudo denied) — use localhost URLs below."
+    blue "to enable forum.conclave.local later, run:"
+    blue "  echo '127.0.0.1 forum.conclave.local api.conclave.local' | sudo tee -a /etc/hosts"
+fi
 
 # ── 3. bring stack up ───────────────────────────────────────────────────
 # Plumb host paths into mcp-pods so it can bind-mount Claude creds + the
@@ -65,4 +82,8 @@ for i in {1..30}; do
     sleep 2
 done
 
-green "conclave is up. open http://forum.conclave.local"
+if [[ "${HOSTS_OK}" == 1 ]]; then
+    green "conclave is up. open http://forum.conclave.local"
+else
+    green "conclave is up. open http://localhost:5173 (forum) — http://localhost:8000 (api)"
+fi
