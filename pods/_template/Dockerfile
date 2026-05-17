@@ -38,5 +38,20 @@ COPY system_preamble.md /pod/system_preamble.md
 COPY agent /pod/agent
 COPY workspace /pod/workspace
 
+# Claude CLI refuses --dangerously-skip-permissions when running as
+# root (security check, pass-3 G18). Create a non-root user and chown
+# everything the agent and workspace need to read/write. UID 1000
+# matches the host user in the typical dev setup.
+RUN useradd -m -u 1000 -s /bin/bash pod \
+    && mkdir -p /pod/.claude \
+    && chown -R pod:pod /pod \
+    && chown -R pod:pod /root/.claude 2>/dev/null || true
+
+# Move the Claude creds mount target from /root/.claude to /home/pod/.claude
+# via HOME=/home/pod (compose template binds the file at that path now).
+ENV HOME=/home/pod
+
+USER pod
+
 EXPOSE 8000
 CMD ["python", "/pod/agent/bootstrap.py"]
