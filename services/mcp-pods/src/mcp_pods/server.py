@@ -39,6 +39,13 @@ async def lifespan(server: FastMCP):
                     "template image pre-build failed; SpawnFirstPod will "
                     "still try, but the first spawn will be slow"
                 )
+            # Reap orphan placeholder rows whose container never made it
+            # past bootstrap. Without this, a single crashed first-pod
+            # spawn permanently blocks SpawnFirstPod (count > 0 holds).
+            try:
+                await service.reconcile_orphans()
+            except Exception:
+                log.exception("orphan reconciler failed (non-fatal)")
 
             async def on_proposal_closed(data: dict[str, Any]) -> None:
                 await service.on_proposal_closed(data)
