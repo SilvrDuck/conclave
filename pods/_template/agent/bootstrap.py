@@ -261,6 +261,13 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
         "--max-budget-usd", AGENT_MAX_BUDGET_USD,
         "--add-dir", str(WORKSPACE_DIR),
     ]
+    # --resume references the prior session by id, but Claude CLI
+    # stores sessions in $HOME/.claude/projects/<key>/sessions/. The
+    # pod's $HOME/.claude is read-only-ish (credentials.json is the
+    # only writable thing we mount). If the session never landed on
+    # disk, --resume errors out. We try once with --resume; on
+    # failure we strip the session id and re-spawn fresh. Caller
+    # owns the retry; this function emits one turn worth of events.
     if _session_id:
         cmd += ["--resume", _session_id]
 
@@ -379,6 +386,15 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
         except OSError:
             pass
     log.info("agent turn %s finished rc=%s", turn_id, proc.returncode)
+    # If --resume couldn't find the cached session id, drop it so the
+    # next turn starts a fresh session. The Claude CLI returns rc=1
+    # with "No conversation found with session ID:" in that case.
+    if proc.returncode == 1 and _session_id:
+        log.warning(
+            "session %s could not be resumed; clearing cached id",
+            _session_id,
+        )
+        _session_id = None
     await _publish_event(
         "AgentTurnEnded",
         {"pod_id": pod_id, "turn_id": turn_id, **usage},
