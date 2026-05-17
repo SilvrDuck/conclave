@@ -23,6 +23,7 @@ durable consumer cursor.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -32,6 +33,8 @@ from nats.aio.client import Client as NATSClient
 from nats.js import JetStreamContext
 from nats.js.api import RetentionPolicy
 from nats.js.errors import BadRequestError
+
+log = logging.getLogger("conclave.bus")
 
 from conclave_core.events import DomainEvent
 
@@ -156,8 +159,16 @@ class Bus:
         *,
         durable: str | None = None,
         manual_ack: bool = True,
+        poison_threshold: int = 5,
     ) -> None:
-        """Push subscription. `handler` receives the parsed JSON payload."""
+        """Push subscription. `handler` receives the parsed JSON payload.
+
+        Poison-event handling: a message whose delivery count exceeds
+        `poison_threshold` is `term()`'d (NATS removes it from the
+        consumer's pending set permanently) instead of being nak'd
+        forever. Kanban #23. The original behaviour — infinite nak +
+        retry — wedged the projection on any malformed event.
+        """
 
         async def cb(msg: Any) -> None:
             try:
@@ -167,7 +178,24 @@ class Bus:
                     await msg.ack()
             except Exception:
                 if manual_ack:
-                    await msg.nak()
+                    # NATS delivery metadata may include `num_delivered`.
+                    delivered = 0
+                    try:
+                        meta = msg.metadata
+                        delivered = int(getattr(meta, "num_delivered", 0) or 0)
+                    except Exception:
+                        pass
+                    if delivered >= poison_threshold:
+                        log.error(
+                            "poison event on %s (delivered %d×); term()ing: %s",
+                            subject, delivered, msg.data[:512],
+                        )
+                        try:
+                            await msg.term()
+                        except Exception:
+                            await msg.nak()
+                    else:
+                        await msg.nak()
                 raise
 
         await self._js.subscribe(subject, cb=cb, durable=durable, manual_ack=manual_ack)
