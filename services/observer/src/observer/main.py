@@ -19,6 +19,7 @@ from observer.reactors.annotation import AnnotationRequester
 from observer.reactors.block import BlockDetector
 from observer.reactors.digester import ActivityDigester
 from observer.reactors.health import HealthWatcher
+from observer.reactors.identify_callers import IdentifyCallers
 from observer.services.observation import ObservationService
 from observer.services.operator import OperatorService
 from observer.state import AppState, EventBroadcaster
@@ -65,6 +66,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             BlockDetector(pool=pool, bus=bus),
             ActivityDigester(pool=pool),
             AnnotationRequester(pool=pool, bus=bus),
+            IdentifyCallers(pool=pool, bus=bus),
         ]
         for r in reactors:
             await r.start()

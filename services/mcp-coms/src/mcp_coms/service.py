@@ -61,6 +61,70 @@ class ComsService:
         log.info("CouncilOpened %s topic=%r participants=%d", council_id, topic, len(participants))
         return council_id
 
+    async def convene_contract_change(
+        self,
+        *,
+        pod_id: str,
+        participants: list[str],
+        endpoint_line: str,
+    ) -> str:
+        """Find-or-reuse a 'shape of new contract' council for the
+        given participant set. Spec/02 Phase 6.
+
+        Idempotent under NATS redelivery and across multiple
+        EndpointContractChanged events from the same ingest batch:
+        rather than opening N councils with identical participants,
+        we reuse the open one and append the new endpoint to its
+        topic. Lock keyed on the sorted-participants + pod_id hash
+        so concurrent reactor invocations queue rather than fork."""
+        sorted_parts = sorted(participants)
+        topic_prefix = f"Shape of new contract on {pod_id}"
+        lock_key = f"contract-change:{pod_id}:{'|'.join(sorted_parts)}"
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                await conn.execute(
+                    "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))",
+                    lock_key,
+                )
+                row = await conn.fetchrow(
+                    """SELECT council_id, topic FROM council.councils
+                         WHERE status = 'open'
+                           AND topic LIKE $1
+                           AND participants @> $2::text[]
+                           AND $2::text[] @> participants
+                         LIMIT 1""",
+                    f"{topic_prefix}%",
+                    sorted_parts,
+                )
+                if row is not None:
+                    # Extend the existing topic if this endpoint isn't
+                    # already named. Keeps the council human-readable
+                    # without spawning a duplicate.
+                    existing_topic = row["topic"]
+                    if endpoint_line not in existing_topic:
+                        new_topic = f"{existing_topic}; {endpoint_line}"
+                        await conn.execute(
+                            """UPDATE council.councils SET topic = $2
+                                WHERE council_id = $1""",
+                            row["council_id"],
+                            new_topic,
+                        )
+                    log.info(
+                        "convene_contract_change reusing %s on %s",
+                        row["council_id"], pod_id,
+                    )
+                    return row["council_id"]
+        # No existing council — open a fresh one. convene_council
+        # publishes CouncilOpened; we keep two SQL transactions here
+        # (lookup + insert) to avoid holding the advisory lock through
+        # the bus publish, since publish can outlast a single txn.
+        return await self.convene_council(
+            topic=f"{topic_prefix}: {endpoint_line}",
+            participants=sorted_parts,
+            private=False,
+            needs_augustus=False,
+        )
+
     async def post_message(self, *, council_id: str, from_pod: str, body: str) -> int:
         if not body.strip():
             raise ValueError("message body must be non-empty")
