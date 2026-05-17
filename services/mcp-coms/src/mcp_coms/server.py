@@ -42,9 +42,11 @@ async def lifespan(server: FastMCP):
 
             async def on_contract_change(data: dict[str, Any]) -> None:
                 """Spec/02 Phase 6 — callers may convene a council
-                ('shape of new contract') before balloting. We open
-                that council automatically with the affected pod +
-                its callers as participants."""
+                ('shape of new contract') before balloting. ONE
+                council per (pod, caller-set); the find-or-reuse
+                pattern lives in ComsService.convene_contract_change.
+                Defensive on the data shape so a redeliver doesn't
+                crash the consumer."""
                 try:
                     pod_id = data["pod_id"]
                     method = data["method"]
@@ -53,15 +55,10 @@ async def lifespan(server: FastMCP):
                     participants = sorted(set([pod_id, *callers]))
                     if len(participants) < 2:
                         return
-                    topic = (
-                        f"Shape of new contract on {pod_id}: "
-                        f"{method} {path}"
-                    )
-                    await service.convene_council(
-                        topic=topic,
+                    await service.convene_contract_change(
+                        pod_id=pod_id,
                         participants=participants,
-                        private=False,
-                        needs_augustus=False,
+                        endpoint_line=f"{method} {path}",
                     )
                 except Exception:
                     log.exception(

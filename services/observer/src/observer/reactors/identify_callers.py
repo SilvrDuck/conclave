@@ -46,13 +46,18 @@ class IdentifyCallers:
         method = data["method"]
         path = data["path"]
         # Callers = distinct src_pod values that have ever hit this
-        # pod (any method/path). If empty, this is the first endpoint
-        # on a pod that no one has called yet — nothing to identify.
+        # pod, excluding self and any non-admitted / exiled pod. An
+        # exiled caller no longer has standing in a council; an
+        # un-admitted caller is a placeholder we shouldn't summon.
         async with self._pool.acquire() as conn:
             rows = await conn.fetch(
-                """SELECT DISTINCT src_pod
-                     FROM observer.calls
-                    WHERE dst_pod = $1 AND src_pod <> $1""",
+                """SELECT DISTINCT c.src_pod
+                     FROM observer.calls c
+                     JOIN pods.pods p ON p.pod_id = c.src_pod
+                    WHERE c.dst_pod = $1
+                      AND c.src_pod <> $1
+                      AND p.admitted = TRUE
+                      AND p.exiled = FALSE""",
                 pod_id,
             )
         callers = [r["src_pod"] for r in rows]
