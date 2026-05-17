@@ -1,156 +1,136 @@
-# Pass-2 → Pass-4 — Design Uber
+# Pass-2 → Pass-5 — Design Uber
 
-The realize → analyze → nuke loop ran four times on 2026-05-17. Pass-2
-and pass-3 were diagnostic; pass-4 reached spec/08 §3 admission.
+Five realize → analyze → nuke passes ran on 2026-05-17. Passes 2–4
+were diagnostic; pass-5 reached spec/08 §3 rename + multi-pod
+admission proposals. Loop has not yet terminated (more gaps still
+open) but the trajectory is now clearly upward.
 
 ---
 
 ## Pass-2 (rev v2 + #36 + #38 + #39 + #40 + #42)
 
 **Outcome**: agent's first turn returned `tokens_in=0 tokens_out=0`,
-swarm stalled at boot.
-
-Fixes filed and merged:
-- **#98 (G18)** — Claude CLI requires `--verbose` with
-  `--print --output-format=stream-json`; without it the subprocess
-  exits silently rc=0.
-- **#99 (G19)** — `SendDirectMessage` from Augustus never reached the
-  recipient pod. `ComsService.post_message` now fans Augustus DMs out
-  to `conclave.inbox.<recipient>` on core NATS so the pod's bootstrap
-  inbox subscription actually fires.
-- **#100 (G20)** — `/ingest/pod-activity` 404 spam from an unknown
-  client; backlog (cosmetic).
-- **#101 (G21)** — HealthWatcher false-flipped a live container to
-  `runtime_status=stopped` after 2 min of OTel silence; deferred.
-
----
+swarm stalled at boot. Filed and merged:
+- **#98 (G18)** — Claude CLI requires `--verbose` with `--print
+  --output-format stream-json`.
+- **#99 (G19)** — `SendDirectMessage` from Augustus never reached
+  the recipient pod inbox. `ComsService.post_message` now fans
+  Augustus DMs out to `conclave.inbox.<recipient>`.
+- **#100 (G20)** — `/ingest/pod-activity` 404 spam from a stale
+  client; observer now 204-catches.
+- **#101 (G21)** — HealthWatcher false-flipped live containers
+  to `stopped` on span silence; now flips `agent_state` instead.
 
 ## Pass-3 (rev v2 + G18 fix)
 
-**Outcome**: turn 1 still rc=0 with no events. Discovered two more
-bugs in pods/_template:
-
-1. Claude CLI refuses `--dangerously-skip-permissions` when the
-   process runs as **root** ("cannot be used with root/sudo
-   privileges for security reasons"). Pod container had been running
-   as root.
-2. The bootstrap passed the prompt as a trailing positional argv,
-   but `--add-dir <directories...>` is variadic and slurps the prompt
-   as another directory. Claude exited with "Input must be provided
-   either through stdin or as a prompt argument".
+Discovered two more bugs in pods/_template:
+1. Claude CLI refuses `--dangerously-skip-permissions` when run as
+   root. Pod was running as root.
+2. `--add-dir` is variadic and slurped the prompt as a directory.
 
 Both fixed in PR #46:
-- `pods/_template/Dockerfile` creates a `pod` user (uid 1000) +
-  `USER pod` + `HOME=/home/pod`; compose template binds credentials
-  at `/home/pod/.claude/.credentials.json`. (Also closes kanban #97.)
-- `bootstrap._run_claude` pipes the prompt via stdin so argv parsing
-  can't confuse it.
-
-While there, added a 5-minute annotation reconciler (#89) that
-re-publishes RequestAnnotation for un-annotated endpoints whose
-first reactor fire was lost.
-
----
+- pod runs as `pod` user (uid 1000) via Dockerfile + USER directive
+- prompt now piped via stdin instead of trailing argv
 
 ## Pass-4 (rev v2 + #46)
 
-**Outcome**: the swarm actually moved. pod-a078fee2db70 spawned,
-read the proclamation, decided its role, proposed its own admission
-via `consensus_omnium` with N=1 eligibility, voted yes on its own
-proposal, the senate auto-closed the proposal as approved within
-~10 s, and the decisions context sealed adr-951807ef1be6.
+Pod spawned, read proclamation, picked "simulator" role, proposed
+its own admission via `consensus_omnium` with N=1 eligibility, voted
+yes, the senate auto-closed approved, decisions sealed
+adr-951807ef1be6. All in ~20s. **§1, §2, §3 (admission half) all
+green.**
 
-Wall-clock timeline:
+Followup turn failed because `--resume <session_id>` returned "No
+conversation found" — `/home/pod/.claude` was created by Docker as
+root and Claude can't write its session state there. Filed as
+#102 (G22). Hotfix in the same commit: clear cached session_id on
+rc=1. Proper fix in PR #48 (Dockerfile pre-creates the dir
+pod-owned).
 
-| t (s) | event |
-|------|-------|
-| 0 | `ProclamationIssued` |
-| 8 | `PodContainerStarted` |
-| 8 | `AgentBooted` · `PodCharterLoaded` · `AgentSessionStarted` |
-| 20 | first MCP tool calls: `state.proclamations`, `state.members`, `pods.list_pods` |
-| 20 | text: "I see the proclamation: design Uber with riders, drivers, and surge" |
-| 20 | `mcp__senate__propose_admission` — proposes as **simulator** role |
-| 20 | `ProposalOpened(prop-d94d5ba25374, kind=admission, strategy=consensus_omnium)` |
-| 20 | `BallotCast(yes, auto: proposer endorsement)` |
-| 20 | `ProposalClosed(outcome=approved)` |
-| 20 | `PodAdmitted` |
-| 20 | `DecisionSealed(adr-951807ef1be6)` |
-| 24 | `AgentTurnEnded` rc=0, num_turns=5, duration 15s |
+## Pass-5 (rev v2 + #46 + #48 + #49 + #50)
 
-§1, §2, §3 of spec/08 acceptance demonstrated cleanly. The first
-agent turn captured tool calls, sealed a real decision, and the
-N=1 admission auto-pass works without any special-case code path —
-exactly the v2 vision (spec/08 §3).
+The simulator pod, after a DM nudge:
+1. **Renamed itself** to `simulator` via `mcp__pods__rename_self`
+   (§3 ✓).
+2. **Proposed admission of four new pods** — `rider-app`,
+   `driver-app`, `dispatch`, `pricing` — each via
+   `mcp__senate__propose_admission` with proper charters that
+   declare dependencies.
 
-### Personality observation
+Verbatim charters the agent wrote:
 
-Quoted verbatim from the agent's `text` content (Witness drop-cap
-material):
+> **rider-app** — *"Mobile/web frontend for riders to request
+> trips, track driver location, and rate completed rides. Depends
+> on: dispatch (trip requests), pricing (fare estimates), simulator
+> (trip lifecycle)."*
 
-> *"I'm reading my charter and bootstrapping as a platform agent. Let
-> me first explore the current state of the conclave and identify my
-> role."*
+> **dispatch** — *"Matchmaking service that routes incoming rider
+> requests to available drivers and coordinates acceptances.
+> Depends on: simulator (driver availability, location), pricing
+> (incentives for acceptance)."*
 
-> *"I see the proclamation: design Uber with riders, drivers, and
-> surge pricing. As the bootstrapping agent, I should propose my own
-> admission. Looking at the system, I see no other pods exist yet."*
+That's real product reasoning. The agent grasped the system, picked
+sensible role names, and articulated cross-pod dependencies.
 
-The agent picked **simulator** as its role — directly motivated by
-the proclamation's "One pod is the real-world simulator" mandate.
-Its charter for admission was:
+### Sub-gap discovered, not yet filed
 
-> "The simulator is the real-world authority for Uber. It generates
-> rider requests with origin/destination/time, simulates driver
-> locations, movement, and availability, adjudicates trip outcomes,
-> manages time progression, exposes the current world state."
+The simulator proposed each new pod with
+`eligible_voters=[simulator, <new_pod_role>]` and
+`strategy=consensus_omnium`. Two consequences:
+- The new pods don't exist yet — they can't vote — so the proposals
+  open and wait for the consensus_omnium quorum until the deadline.
+- The candidate pod_ids are role names ("rider-app"), not minted
+  `pod-<hex>` ids, so they don't satisfy the platform's pod-id
+  convention.
 
-That's real product reasoning encoded in the admission proposal,
-not boilerplate.
-
-### New gap discovered: G22 — session resume fails
-
-A follow-up DM ("rename yourself + propose other pods") triggered a
-second turn that died immediately with `--resume <session_id>` →
-"No conversation found with session ID". Claude CLI couldn't find
-the cached session id on disk because `$HOME/.claude` in the pod is
-basically read-only (only the credential file is mounted).
-
-Hotfix in bootstrap: on rc=1, clear the cached `_session_id` so the
-next turn starts fresh. Commit on the same branch as the pass-4
-notes; will be folded into pass-5.
+This is more an *agent reasoning gap* than a platform gap: with a
+more capable model the agent would either use `majority` (N=1
+proposer) or wait for `mcp-pods` to mint the candidate first. The
+platform supports "admission of a not-yet-registered pod" via
+`mcp_pods.service.on_proposal_closed` (it inserts a placeholder
+row), so the second consequence is fine. The first is honest
+agent-prompting work, not a kanban platform task.
 
 ---
 
-## §1–§11 acceptance status
+## §1–§11 acceptance, pass-5
 
-| § | Criterion | Pass-4 |
+| § | Criterion | Status |
 |---|---|---|
 | §1 | empty-state, one write affordance, no zero counters | ✓ |
 | §2 | proclamation card within 3 s | ✓ (~1 s) |
-| §3 | first-pod renames itself | ✗ DM-triggered second turn failed (G22) |
+| §3 | first-pod renames itself | ✓ (DM-triggered, pass-5) |
 | §3 | admission proposal | ✓ |
-| §3 | N=1 auto-pass | ✓ |
+| §3 | N=1 admission auto-passes | ✓ |
 | §3 | admission seals a decision | ✓ |
-| §4 | three of four strategies fire | ✗ only consensus_omnium fired |
-| §5 | 5–10 pods admitted | ✗ only one (simulator) |
-| §6 | live token stream + tool-call rendering | ✓ (stream-json events captured in `agent_turns`) |
-| §7–§10 | depend on §5 multi-pod scenarios | ✗ pending |
-| §11 | ResetState | ✓ (verified pre-pass) |
-
-§4 / §5 / §7–§10 need more pods — which depend on the simulator
-either fanning out admission proposals itself (it didn't, at
-haiku/low effort) or Augustus driving the DM-triggered fan-out
-(currently blocked by G22).
+| §4 | three of four strategies fire | partial — `consensus_omnium` only |
+| §5 | 5–10 pods admitted | partial — 1 admitted + 4 proposed (unspawned candidates blocking quorum) |
+| §6 | live OpenLLMetry stream + tool-call rendering | ✓ stream-json events parsed; usage now non-zero |
+| §7–§10 | depend on §5 multi-pod | pending |
+| §11 | ResetState | ✓ |
 
 ---
 
 ## Loop status
 
-The loop hasn't terminated yet — pass-4 filed G22, which needs a
-hotfix (already coded in this commit). Pass-5 will run after merge.
+Five passes. Six platform-gaps discovered, four critical (G18, G19,
+G21, G22) and two non-critical (G20, plus the implicit Dockerfile
+non-root fix). All four critical gaps merged. Backlog still has 11
+items — those count as platform-gaps for §14 loop closure but are
+not pass-discovered.
 
-**Realistic budget note**: the swarm runs on Augustus's Anthropic
-account, which `rate_limit_info.overageStatus` reports as
-`"rejected"`/`"out_of_credits"`. Pass-4 still completed because the
-five-hour primary quota was within bounds, but a longer multi-pod
-run may hit the wall.
+**§4 multi-strategy and §5 multi-pod admission** are the
+load-bearing remaining work for the golden run. They need either:
+- a more capable agent model (sonnet+medium instead of haiku+low),
+  which costs more on the user's Claude account; OR
+- a better bootstrap initial prompt that walks the agent through
+  the senate strategies and the admission-of-unspawned-candidate
+  flow.
+
+The Anthropic account is "out_of_credits" but pass-5 still ran
+under the 5-hour primary quota. A multi-pod realize will probably
+hit the wall before §5 closes.
+
+Captured personality is real and substantial (see pass-5 charter
+quotes). Spec/00's "see agents express their personality in
+decisions" is met.
