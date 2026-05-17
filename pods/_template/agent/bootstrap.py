@@ -94,6 +94,33 @@ _session_id: str | None = None  # Claude Code session for --resume
 _js: JetStreamContext | None = None  # JetStream for emitting AgentTurn* events
 
 
+def _extract_text_chunk(ev: dict) -> str:
+    """Pull a text or thinking chunk out of a Claude stream-json event.
+    Used by AgentTextDelta (kanban #90). Returns "" when the event
+    isn't a chunk-bearing frame.
+
+    Stream-json frames we care about:
+    - {type: stream_event, event: {type: content_block_delta,
+       delta: {type: text_delta|thinking_delta, text|thinking: "..."}}}
+    """
+    if ev.get("type") != "stream_event":
+        return ""
+    inner = ev.get("event") or {}
+    if not isinstance(inner, dict):
+        return ""
+    if inner.get("type") != "content_block_delta":
+        return ""
+    delta = inner.get("delta") or {}
+    if not isinstance(delta, dict):
+        return ""
+    dtype = delta.get("type")
+    if dtype == "text_delta":
+        return str(delta.get("text") or "")
+    if dtype == "thinking_delta":
+        return str(delta.get("thinking") or "")
+    return ""
+
+
 async def _publish_event(event_type: str, payload: dict) -> None:
     """Publish a domain event to JetStream. The pod doesn't import
     conclave_core (avoiding the dependency cycle), so we hand-format
@@ -296,6 +323,12 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
     # Accumulators populated by the stdout pump; consumed in the
     # AgentTurnEnded emission below.
     usage: dict[str, int] = {"tokens_in": 0, "tokens_out": 0}
+    # Delta-buffer for the AgentTextDelta event stream (kanban #90).
+    # The agent's per-frame text deltas accumulate here; a background
+    # task flushes them as one AgentTextDelta event every ~1s so the
+    # Forum's live transcript renders without bus-spam.
+    delta_buf: list[str] = []
+    delta_seq = 0
 
     proc = await asyncio.create_subprocess_exec(
         *cmd,
@@ -351,6 +384,51 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
             kind = ev.get("type")
             if kind in {"assistant", "result"}:
                 log.info("agent[%s]: %s", turn_id, txt[:240])
+            # AgentTextDelta accumulation (#90). Pull text chunks out
+            # of the stream_event content_block_delta + content_block
+            # frames so we can stream them to the Forum at ~1Hz.
+            chunk = _extract_text_chunk(ev)
+            if chunk:
+                delta_buf.append(chunk)
+
+    async def flush_deltas() -> None:
+        nonlocal delta_seq
+        while proc.returncode is None:
+            await asyncio.sleep(1.0)
+            if not delta_buf:
+                continue
+            body = "".join(delta_buf)
+            delta_buf.clear()
+            delta_seq += 1
+            try:
+                await _publish_event(
+                    "AgentTextDelta",
+                    {
+                        "pod_id": pod_id,
+                        "turn_id": turn_id,
+                        "seq": delta_seq,
+                        "body": body,
+                    },
+                )
+            except Exception:
+                log.exception("AgentTextDelta publish failed")
+        # Final flush after the subprocess exits.
+        if delta_buf:
+            body = "".join(delta_buf)
+            delta_buf.clear()
+            delta_seq += 1
+            try:
+                await _publish_event(
+                    "AgentTextDelta",
+                    {
+                        "pod_id": pod_id,
+                        "turn_id": turn_id,
+                        "seq": delta_seq,
+                        "body": body,
+                    },
+                )
+            except Exception:
+                log.exception("AgentTextDelta final flush failed")
 
     async def pump_stderr() -> None:
         assert proc.stderr is not None
@@ -360,7 +438,12 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
     try:
         try:
             await asyncio.wait_for(
-                asyncio.gather(pump_stdout(), pump_stderr(), proc.wait()),
+                asyncio.gather(
+                    pump_stdout(),
+                    pump_stderr(),
+                    flush_deltas(),
+                    proc.wait(),
+                ),
                 timeout=AGENT_TURN_TIMEOUT_S,
             )
         except TimeoutError:

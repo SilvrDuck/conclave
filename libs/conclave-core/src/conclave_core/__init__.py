@@ -12,6 +12,7 @@ from conclave_core.db import database_url, pool
 from conclave_core.events import (
     AgentBooted,
     AgentSessionStarted,
+    AgentTextDelta,
     AgentTurnEnded,
     AgentTurnStarted,
     BallotCast,
@@ -51,6 +52,7 @@ from conclave_core.models import (
 __all__ = [
     "AgentBooted",
     "AgentSessionStarted",
+    "AgentTextDelta",
     "AgentTurnEnded",
     "AgentTurnStarted",
     "BallotCast",

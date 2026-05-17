@@ -292,3 +292,15 @@ class AgentTurnEnded(DomainEvent):
     turn_id: str
     tokens_in: int
     tokens_out: int
+
+
+class AgentTextDelta(DomainEvent):
+    """Per-frame delta of the agent's text output, streamed at ~1Hz
+    during a turn so the Forum can render live transcript in J4's
+    Pod folio. Kanban #90."""
+
+    event_type: Literal["AgentTextDelta"] = "AgentTextDelta"
+    pod_id: str
+    turn_id: str
+    seq: int
+    body: str
