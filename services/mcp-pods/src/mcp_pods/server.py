@@ -13,6 +13,7 @@ from fastmcp import Context, FastMCP
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
+from mcp_pods.docker_events import DockerEventsWatcher
 from mcp_pods.service import PodsService
 from mcp_pods.spawner import build_template_image
 
@@ -46,6 +47,12 @@ async def lifespan(server: FastMCP):
                 await service.reconcile_orphans()
             except Exception:
                 log.exception("orphan reconciler failed (non-fatal)")
+
+            # Docker-events watcher: emits PodHealthChanged within ~1s
+            # of any pod container's die/kill/stop/start. Spec/08 §10
+            # R1 wants 5s. Kanban #24.
+            docker_watcher = DockerEventsWatcher(bus=bus)
+            await docker_watcher.start()
 
             async def on_proposal_closed(data: dict[str, Any]) -> None:
                 await service.on_proposal_closed(data)
@@ -95,7 +102,10 @@ async def lifespan(server: FastMCP):
                 on_nuke_pods,
                 durable="mcp-pods-nuke",
             )
-            yield {"service": service}
+            try:
+                yield {"service": service}
+            finally:
+                await docker_watcher.stop()
 
 
 mcp = FastMCP(name="conclave-pods", lifespan=lifespan)
