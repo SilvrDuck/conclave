@@ -2,25 +2,45 @@
 @import "@radix-ui/themes/styles.css";
 @import "@xyflow/react/dist/style.css";
 
-/* ── Illuminated theme tokens ────────────────────────────────────────
- * Manuscript palette for authored cards (proclamations, charters,
- * sealed decisions, council transcripts). The graph (ReactFlow) and
- * platform chrome (badges, dropdowns, tabs) keep their library
- * defaults — see services/forum/src/components/PodNode.tsx for how
- * pod nodes apply manuscript tones without rebuilding ReactFlow.
- * ----------------------------------------------------------------- */
+/* Spec/09 — Forum UX
+ *
+ * The page IS parchment; the data IS ink. The palette below is the
+ * full §8 vocabulary; every component composes these tokens. The
+ * scope is :root (not a .manuscript class) so the chrome IS the
+ * manuscript surface, not an opt-in overlay.
+ */
+
 :root {
-  color-scheme: dark;
-  --conclave-parchment: #f3e9c8;
-  --conclave-parchment-dim: #e2d5a8;
-  --conclave-ink: #2a1d0e;
-  --conclave-ink-dim: #5b4a2e;
-  --conclave-rubric: #8a2c1d;        /* red used in medieval rubrics */
-  --conclave-gold: #c79a3a;          /* illumination accent */
-  --conclave-gold-faint: rgba(199, 154, 58, 0.25);
-  --conclave-margin: rgba(199, 154, 58, 0.4);
-  --conclave-display-font: "Cinzel", "Trajan Pro", serif;
-  --conclave-body-font: "Cormorant Garamond", "EB Garamond", Georgia, serif;
+  color-scheme: light;
+
+  /* §8 — Palette */
+  --c-parchment: #f4ecd8;
+  --c-vellum: #e8dcc0;
+  --c-ink: #1f1a14;
+  --c-ink-faded: #6b5e48;
+  --c-gold: #a48143;
+  --c-verdigris: #3b5a3c;
+  --c-cinnabar: #7a1f1f;
+  --c-blue: #1f3d4a;
+  --c-wash: #c8bfa5;
+
+  /* §7 — Typography. Three faces. */
+  --f-display: "Cinzel", "Trajan Pro", serif;
+  --f-body: "EB Garamond", Georgia, serif;
+  --f-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* §7 — Discontinuous size scale. */
+  --t-marginalia: 12px;
+  --t-roll: 13px;
+  --t-body: 14px;
+  --t-charter: 15px;
+  --t-proclamation: 16px;
+  --t-heading: 20px;
+  --t-numeral: 20px;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 html,
@@ -31,83 +51,187 @@ body,
 }
 
 body {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    sans-serif;
+  background: var(--c-parchment);
+  color: var(--c-ink);
+  font-family: var(--f-body);
+  font-size: var(--t-body);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Manuscript surfaces. Apply with className="manuscript". */
-.manuscript {
-  background: linear-gradient(
-    180deg,
-    var(--conclave-parchment) 0%,
-    var(--conclave-parchment-dim) 100%
-  );
-  color: var(--conclave-ink);
-  font-family: var(--conclave-body-font);
-  border: 1px solid var(--conclave-margin);
-  box-shadow: inset 0 0 24px var(--conclave-gold-faint);
-}
-
-.manuscript h1,
-.manuscript h2,
-.manuscript h3,
-.manuscript .rubric {
-  font-family: var(--conclave-display-font);
-  letter-spacing: 0.05em;
-  color: var(--conclave-rubric);
-}
-
-.manuscript .gold {
-  color: var(--conclave-gold);
-}
-
-.manuscript-numeral {
-  font-family: var(--conclave-display-font);
-  color: var(--conclave-gold);
-  letter-spacing: 0.1em;
-}
-
-/* Phylactery — Roman speech-bubble shape for council messages.
- * Apply with className="phylactery"; container provides background. */
-.phylactery {
-  position: relative;
-  background: var(--conclave-parchment);
-  color: var(--conclave-ink);
-  font-family: var(--conclave-body-font);
-  padding: 0.75rem 1rem;
-  border-radius: 0.5rem;
-  border: 1px solid var(--conclave-margin);
-}
-
-.phylactery::after {
-  content: "";
-  position: absolute;
-  left: 1.5rem;
-  bottom: -0.5rem;
-  width: 0;
-  height: 0;
-  border-left: 0.5rem solid transparent;
-  border-right: 0.5rem solid transparent;
-  border-top: 0.5rem solid var(--conclave-parchment);
-}
-
-.phylactery .sender {
-  font-family: var(--conclave-display-font);
-  font-size: 0.75rem;
-  letter-spacing: 0.05em;
-  color: var(--conclave-rubric);
+/* §7 — Cinzel reserved for display use, ≤14px, all-caps / small-caps. */
+.c-display {
+  font-family: var(--f-display);
+  font-weight: 500;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-size: var(--t-body);
 }
 
-/* EntityLink — clickable in-text reference to another forum entity. */
-.entity-link {
-  color: var(--conclave-gold);
+.c-display-sm {
+  font-family: var(--f-display);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  font-size: 11px;
+}
+
+/* Mono — stable ids, hostnames, OpenLLMetry, scribal timestamps. */
+.c-mono {
+  font-family: var(--f-mono);
+  font-size: 12px;
+}
+
+/* Ink-link — the only blue thing in the system. Click-traverse. */
+.c-link {
+  color: var(--c-blue);
   text-decoration: underline dotted;
   text-underline-offset: 2px;
   cursor: pointer;
-  font-weight: 500;
+  font-style: normal;
 }
 
-.entity-link:hover {
-  color: var(--conclave-rubric);
+.c-link:hover {
+  text-decoration-style: solid;
+  color: var(--c-ink);
+}
+
+/* Faded ink — secondary type, hairline rules. */
+.c-faded {
+  color: var(--c-ink-faded);
+}
+
+/* Gold accent — proclamation numerals, sealed-decision rule,
+ * Augustus's DM ink. Never a fill, never a hover state. */
+.c-gold {
+  color: var(--c-gold);
+}
+
+.c-rubric {
+  font-family: var(--f-display);
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--c-cinnabar);
+  font-size: 11px;
+}
+
+/* Scribal numeral — EB Garamond semibold lining figures. */
+.c-numeral {
+  font-family: var(--f-body);
+  font-weight: 600;
+  font-feature-settings: "lnum" 1;
+  font-size: var(--t-numeral);
+  letter-spacing: 0.04em;
+}
+
+/* §6.1 — Bandeau row. */
+.c-bandeau {
+  height: 40px;
+  background: var(--c-parchment);
+  border-bottom: 0.5px solid var(--c-ink-faded);
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  gap: 16px;
+}
+
+/* §3 — Drop cap. Only used by the <Proclamation> component. */
+.c-dropcap::first-letter {
+  font-family: var(--f-body);
+  font-weight: 600;
+  font-size: 3.2em;
+  line-height: 1;
+  float: left;
+  margin: 0.04em 0.1em 0 0;
+  color: var(--c-gold);
+}
+
+/* §9 — OTel call-edge ink-bloom: 600ms verdigris strike on traffic. */
+@keyframes ink-bloom {
+  0% { opacity: 0; }
+  35% { opacity: 1; }
+  100% { opacity: 0.4; }
+}
+
+.c-edge-bloom {
+  animation: ink-bloom 600ms ease-out forwards;
+  stroke: var(--c-verdigris);
+}
+
+/* §9 — Stuck pip pulses cinnabar at 1.5Hz. The only periodic
+ * animation in the system. */
+@keyframes stuck-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+.c-pip-stuck {
+  animation: stuck-pulse 1.333s ease-in-out infinite;
+}
+
+/* §9 — Drop cap fades in once on first render. */
+@keyframes ink-bleed {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.c-fade-in {
+  animation: ink-bleed 200ms ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .c-edge-bloom,
+  .c-fade-in {
+    animation: ink-bleed 80ms ease-out forwards;
+  }
+  .c-pip-stuck {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+/* Override Radix Theme defaults so dialogs sit on vellum. */
+.radix-themes {
+  --color-background: var(--c-parchment);
+  --color-panel-solid: var(--c-vellum);
+  --color-overlay: rgba(31, 26, 20, 0.45);
+  --gray-12: var(--c-ink);
+}
+
+/* ReactFlow canvas — parchment background, faded-ink edges by default. */
+.react-flow {
+  background: var(--c-parchment);
+}
+
+.react-flow__edge-path {
+  stroke: var(--c-ink-faded);
+  stroke-width: 1;
+  fill: none;
+}
+
+.react-flow__edge.selected .react-flow__edge-path,
+.react-flow__edge:focus .react-flow__edge-path {
+  stroke: var(--c-ink);
+}
+
+.react-flow__node {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-family: var(--f-body);
+}
+
+.react-flow__handle {
+  background: var(--c-ink-faded);
+  border: none;
+  width: 6px;
+  height: 6px;
+}
+
+.react-flow__controls,
+.react-flow__minimap {
+  background: var(--c-vellum);
+  border: 0.5px solid var(--c-ink-faded);
+  box-shadow: none;
 }

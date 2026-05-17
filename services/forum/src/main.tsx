@@ -6,7 +6,11 @@ import "./index.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <Theme appearance="dark" accentColor="indigo" grayColor="slate" radius="medium">
+    {/* Radix Theme provides primitives (dialogs, tooltips, etc.);
+        spec/09 palette tokens override its default colours via the
+        .radix-themes class in index.css. Appearance is light because
+        the parchment surface is light. */}
+    <Theme appearance="light" radius="small" grayColor="sand" scaling="95%">
       <App />
     </Theme>
   </React.StrictMode>,

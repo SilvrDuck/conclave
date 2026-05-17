@@ -1,49 +1,49 @@
+/** Replace conclave-id tokens in arbitrary authored text with
+ * clickable ink-links. Patterns match the actual ids minted by:
+ *
+ *   mcp-pods spawner       — `pod-<hex>` (12 hex chars)
+ *   mcp-senate             — `prop-<hex>`
+ *   mcp-coms               — `council-<hex>`
+ *   mcp-decisions          — `adr-<hex>` (current) / `dec-<hex>` (legacy)
+ *
+ * Plus three special tokens:
+ *
+ *   `№ III` / `#3`         — proclamation references
+ *   `__augustus__`         — rendered as gold "Augustus" (non-clickable)
+ *   `spec/00-vision.md`    — dispatches `conclave:open-spec` event
+ */
+
 import { Fragment, type ReactNode } from "react";
 import { EntityLink } from "./EntityLink";
-import { type EntityRef } from "./PeekContext";
+import type { EntityKind } from "../folio";
 
-/** Patterns matching the actual id shapes minted by the platform.
- * Spec/01 interconnection invariant: every domain entity reference
- * in authored text should resolve to a clickable peek. Keep these
- * in sync with: mcp-pods spawner (pod-…), mcp-senate (prop-…),
- * mcp-coms (council-…), mcp-decisions (adr-…). */
-const PATTERNS: Array<{ regex: RegExp; kind: EntityRef["kind"] }> = [
-  // pod ids: `pod-<hex>` (spawner mints 12-hex; older flows 6-32).
+const PATTERNS: Array<{ regex: RegExp; kind: EntityKind }> = [
   { regex: /\bpod-[0-9a-f]{6,32}\b/g, kind: "pod" },
-  // proposal ids: `prop-<hex>` from senate.proposals.
   { regex: /\bprop-[0-9a-f]{6,32}\b/g, kind: "proposal" },
-  // council ids: `council-<hex>` from council.councils.
   { regex: /\bcouncil-[0-9a-f]{6,32}\b/g, kind: "council" },
-  // decision ids: `adr-<hex>` (current mint) or `dec-<hex>` (legacy).
   { regex: /\badr-[0-9a-f]{6,32}\b/g, kind: "decision" },
   { regex: /\bdec-[0-9a-f]{6,32}\b/g, kind: "decision" },
 ];
 
 const AUGUSTUS_RE = /\b__augustus__\b/g;
-// Proclamation seq references: `№ 1`, `№1`, `# 1`, `#1`. Anchored on
-// the conclave-specific glyphs and forms so we don't false-positive
-// on generic "#1" mentions in arbitrary text.
 const PROCLAMATION_RE = /(?:№\s?|#\s?)(\d+)\b/g;
-// Spec file refs: `spec/00-vision.md` etc — used in council
-// summaries and decision bodies that quote the spec.
 const SPEC_RE = /\bspec\/(\d{2}-[a-z0-9-]+\.md)\b/g;
 
 type Match = {
   start: number;
   end: number;
-  /** Renderer for this match. */
   render: (key: string) => ReactNode;
 };
 
 function findMatches(text: string): Match[] {
-  const matches: Match[] = [];
+  const out: Match[] = [];
 
   for (const { regex, kind } of PATTERNS) {
     const re = new RegExp(regex.source, regex.flags);
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
       const id = m[0];
-      matches.push({
+      out.push({
         start: m.index,
         end: m.index + id.length,
         render: (key) => (
@@ -55,17 +55,14 @@ function findMatches(text: string): Match[] {
     }
   }
 
-  // __augustus__ — render the literal but it's not a clickable peek
-  // (no pod entity). Style it so it's visibly distinct.
   let am: RegExpExecArray | null;
   const augustusRe = new RegExp(AUGUSTUS_RE.source, AUGUSTUS_RE.flags);
   while ((am = augustusRe.exec(text)) !== null) {
-    const text0 = am[0];
-    matches.push({
+    out.push({
       start: am.index,
-      end: am.index + text0.length,
+      end: am.index + am[0].length,
       render: (key) => (
-        <span key={key} style={{ color: "var(--conclave-rubric)" }}>
+        <span key={key} className="c-gold" style={{ fontStyle: "italic" }}>
           Augustus
         </span>
       ),
@@ -77,7 +74,7 @@ function findMatches(text: string): Match[] {
   while ((pm = procRe.exec(text)) !== null) {
     const full = pm[0];
     const seq = pm[1];
-    matches.push({
+    out.push({
       start: pm.index,
       end: pm.index + full.length,
       render: (key) => (
@@ -93,18 +90,16 @@ function findMatches(text: string): Match[] {
   while ((sm = specRe.exec(text)) !== null) {
     const full = sm[0];
     const fname = sm[1];
-    matches.push({
+    out.push({
       start: sm.index,
       end: sm.index + full.length,
       render: (key) => (
         <a
           key={key}
-          className="entity-link"
+          className="c-link"
           href={`#spec:${fname}`}
           onClick={(e) => {
             e.preventDefault();
-            // Spec viewer is opened by the AboutDialog/SpecDialog
-            // surface — emit a window event the surface listens to.
             window.dispatchEvent(
               new CustomEvent("conclave:open-spec", { detail: fname }),
             );
@@ -116,22 +111,19 @@ function findMatches(text: string): Match[] {
     });
   }
 
-  matches.sort((a, b) => a.start - b.start);
-  // Drop overlaps (e.g. if two regex flavours match the same span).
-  const out: Match[] = [];
+  out.sort((a, b) => a.start - b.start);
+  // Drop overlaps.
+  const deduped: Match[] = [];
   let cursor = 0;
-  for (const m of matches) {
+  for (const m of out) {
     if (m.start >= cursor) {
-      out.push(m);
+      deduped.push(m);
       cursor = m.end;
     }
   }
-  return out;
+  return deduped;
 }
 
-/** Replace conclave-id tokens, Augustus references, proclamation
- * numerals, and spec links in `text` with their clickable / styled
- * equivalents. */
 export function Linkified({ text }: { text: string }) {
   const matches = findMatches(text);
   if (matches.length === 0) return <>{text}</>;

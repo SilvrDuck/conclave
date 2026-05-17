@@ -1,355 +1,365 @@
+/** Spec/09 §3 — Witness perspective. Two-column codex spread.
+ *
+ * Left (≈60%): Codex of Proclamations. Each proclamation rendered
+ * through the Proclamation component (only place that owns the drop
+ * cap), with indented descendants below (councils, proposals,
+ * decisions).
+ *
+ * Right (≈40%): Focused entity. Per §3 "never becomes empty": if
+ * nothing is clicked yet, we show the most-recently-active entity
+ * from the current proclamation (latest decision, falling back to
+ * latest council, falling back to latest proposal). */
+
+import { useEffect, useState } from "react";
 import useSWR from "swr";
-import { Box, Card, Flex, Heading, Text, Badge, Separator } from "@radix-ui/themes";
 import {
-  Council,
-  CouncilMessage,
-  Decision,
-  Proclamation,
-  Proposal,
   fetcher,
+  type Proclamation as ProclamationT,
+  type Council,
+  type Decision,
+  type Proposal,
 } from "../api";
-import { Markdown } from "../components/Markdown";
-import { Linkified } from "../components/Linkified";
+import { Proclamation } from "../components/Proclamation";
+import { Plate } from "../components/Plate";
 import { Phylactery } from "../components/Phylactery";
+import { ProposalCartouche } from "../components/ProposalCartouche";
 import { EntityLink } from "../components/EntityLink";
-import { Glossary } from "../components/Glossary";
+import type { EntityRef } from "../folio";
+import { C } from "../theme";
 
-/** Witness: epoch cards grouped by proclamation. Each proclamation
- * is a chapter; everything emitted while it was the current top of
- * the operator's pile belongs to its epoch. Older proclamations are
- * older chapters. Items issued before any proclamation land in a
- * "Background activity" bucket. */
-type Digest = {
-  hour_bucket: string;
-  summary: string;
-  item_count: number;
-};
-
-export function Witness({ onPodClick: _ }: { onPodClick: (pod_id: string) => void }) {
-  const { data: procs } = useSWR<Proclamation[]>("/state/proclamations", fetcher);
-  const { data: props } = useSWR<Proposal[]>("/state/proposals", fetcher);
-  const { data: counc } = useSWR<Council[]>("/state/councils", fetcher);
-  const { data: decs } = useSWR<Decision[]>("/state/decisions", fetcher);
-  const { data: digests } = useSWR<Digest[]>("/state/digests?limit=12", fetcher);
-
-  if (!procs || !props || !counc || !decs) {
-    return <Text className="p-6" color="gray">loading…</Text>;
-  }
-
-  if (procs.length === 0) {
-    return (
-      <Flex className="p-6" direction="column" gap="2" align="center">
-        <Text size="3" color="gray">No proclamations yet.</Text>
-        <Text size="2" color="gray">Issue one above to open the senate.</Text>
-      </Flex>
-    );
-  }
-
-  // Sort proclamations newest first (seq desc). For each, compute
-  // [openedAt, nextProclamationOpenedAt) and bucket items.
-  const sorted = [...procs].sort((a, b) => b.seq - a.seq);
-  const epochs = sorted.map((p, i) => {
-    const opened = new Date(p.issued_at);
-    const nextOpened = i === 0 ? null : new Date(sorted[i - 1].issued_at);
-    return { proclamation: p, opened, nextOpened };
+export function Witness() {
+  const { data: procs } = useSWR<ProclamationT[]>(
+    "/state/proclamations",
+    fetcher,
+    { refreshInterval: 5000 },
+  );
+  const { data: councils } = useSWR<Council[]>("/state/councils", fetcher, {
+    refreshInterval: 5000,
+  });
+  const { data: decisions } = useSWR<Decision[]>("/state/decisions", fetcher, {
+    refreshInterval: 5000,
+  });
+  const { data: proposals } = useSWR<Proposal[]>("/state/proposals", fetcher, {
+    refreshInterval: 5000,
   });
 
-  const itemsForEpoch = <T extends { created_at?: string; opened_at?: string }>(
-    items: T[],
-    opened: Date,
-    nextOpened: Date | null,
-  ) =>
-    items.filter((it) => {
-      const ts = new Date(it.created_at ?? it.opened_at ?? "");
-      if (Number.isNaN(ts.getTime())) return false;
-      if (ts < opened) return false;
-      if (nextOpened && ts >= nextOpened) return false;
-      return true;
-    });
+  const [focused, setFocused] = useState<EntityRef | null>(null);
+
+  // §3 — right column never empty: when nothing user-clicked, pick
+  // the latest descendant of the most-recent proclamation as the
+  // initial focus.
+  useEffect(() => {
+    if (focused !== null) return;
+    const top = (procs ?? [])[0];
+    if (!top) return;
+    const seqStr = String(top.seq);
+    const isFor = (origin: unknown) =>
+      typeof origin === "object" &&
+      origin !== null &&
+      (origin as { kind?: string }).kind === "proclamation" &&
+      (origin as { id?: string }).id === seqStr;
+    const latestDecision = (decisions ?? []).find((d) => isFor(d.origin));
+    if (latestDecision) {
+      setFocused({ kind: "decision", id: latestDecision.decision_id });
+      return;
+    }
+    const latestCouncil = (councils ?? [])[0];
+    if (latestCouncil) {
+      setFocused({ kind: "council", id: latestCouncil.council_id });
+      return;
+    }
+    const latestProposal = (proposals ?? [])[0];
+    if (latestProposal) {
+      setFocused({ kind: "proposal", id: latestProposal.proposal_id });
+    }
+  }, [focused, procs, decisions, councils, proposals]);
 
   return (
-    <Flex direction="column" gap="6" className="p-6 max-w-5xl mx-auto">
-      {digests && digests.length > 0 ? (
-        <DigestsPanel digests={digests} />
-      ) : null}
-      {epochs.map((e, idx) => {
-        const epochProps = itemsForEpoch(props, e.opened, e.nextOpened);
-        const epochCounc = itemsForEpoch(counc, e.opened, e.nextOpened);
-        const epochDecs = itemsForEpoch(decs, e.opened, e.nextOpened);
-        return (
-          <EpochCard
-            key={e.proclamation.seq}
-            proclamation={e.proclamation}
-            isCurrent={idx === 0}
-            proposals={epochProps}
-            councils={epochCounc}
-            decisions={epochDecs}
-          />
-        );
-      })}
-    </Flex>
+    <div
+      style={{
+        flex: 1,
+        display: "grid",
+        gridTemplateColumns: "minmax(0, 60fr) minmax(0, 40fr)",
+        height: "100%",
+        minHeight: 0,
+      }}
+    >
+      {/* Left — Codex */}
+      <div
+        style={{
+          overflowY: "auto",
+          padding: "24px 32px",
+          borderRight: `0.5px solid ${C.inkFaded}`,
+        }}
+      >
+        {(procs ?? []).length === 0 ? (
+          <p
+            className="c-faded"
+            style={{ fontStyle: "italic", textAlign: "center", marginTop: 64 }}
+          >
+            the record is bare. proclaim, and pages will fill.
+          </p>
+        ) : (
+          (procs ?? []).map((p, idx) => {
+            const seqStr = String(p.seq);
+            const isFor = (origin: unknown) =>
+              typeof origin === "object" &&
+              origin !== null &&
+              (origin as { kind?: string }).kind === "proclamation" &&
+              (origin as { id?: string }).id === seqStr;
+            const ds = (decisions ?? []).filter((d) => isFor(d.origin));
+            const cs = (councils ?? []).filter(
+              (c) =>
+                c.decision_id != null &&
+                ds.some((d) => d.decision_id === c.decision_id),
+            );
+            // Proposals don't carry proclamation_seq yet; surface
+            // open proposals only on the latest proclamation. Filed
+            // as kanban follow-up.
+            const ps = idx === 0 ? (proposals ?? []) : [];
+            return (
+              <ProclamationPage
+                key={p.seq}
+                proc={p}
+                councils={cs}
+                decisions={ds}
+                proposals={ps}
+                isLast={idx === (procs ?? []).length - 1}
+                next={(procs ?? [])[idx + 1] ?? null}
+                onFocus={setFocused}
+              />
+            );
+          })
+        )}
+      </div>
+
+      {/* Right — focused entity */}
+      <div
+        style={{
+          overflowY: "auto",
+          padding: "24px 28px",
+          background: C.parchment,
+        }}
+      >
+        {focused ? (
+          <FocusedEntity target={focused} />
+        ) : (
+          <p
+            className="c-faded"
+            style={{ fontStyle: "italic", textAlign: "center", marginTop: 96 }}
+          >
+            the record's reflection is empty.
+          </p>
+        )}
+      </div>
+    </div>
   );
 }
 
-function EpochCard({
-  proclamation,
-  isCurrent,
-  proposals,
+function ProclamationPage({
+  proc,
   councils,
   decisions,
+  proposals,
+  isLast,
+  next,
+  onFocus,
 }: {
-  proclamation: Proclamation;
-  isCurrent: boolean;
-  proposals: Proposal[];
+  proc: ProclamationT;
   councils: Council[];
   decisions: Decision[];
+  proposals: Proposal[];
+  isLast: boolean;
+  next: ProclamationT | null;
+  onFocus: (ref: EntityRef) => void;
 }) {
   return (
-    <Card className="manuscript">
-      <Flex justify="between" align="baseline" mb="2">
-        <Flex align="baseline" gap="3">
-          <span className="manuscript-numeral text-3xl">{toRoman(proclamation.seq)}</span>
-          <Badge color={proclamation.status === "open" ? "blue" : "green"}>
-            {proclamation.status}
-          </Badge>
-          {isCurrent ? <Badge color="amber">current</Badge> : null}
-        </Flex>
-        <Text size="1" style={{ color: "var(--conclave-ink-dim)" }}>
-          {new Date(proclamation.issued_at).toLocaleString()}
-        </Text>
-      </Flex>
-      <Markdown body={proclamation.text} manuscript={false} />
+    <section style={{ marginBottom: 48 }}>
+      <Proclamation proclamation={proc} fadeIn={false} />
 
-      {decisions.length > 0 ? (
-        <EpochSection title="Decisions">
-          {decisions.map((d) => (
-            <DecisionRow key={d.decision_id} d={d} />
-          ))}
-        </EpochSection>
-      ) : null}
-
-      {councils.length > 0 ? (
-        <EpochSection title="Councils">
-          {councils.map((c) => (
-            <CouncilCard key={c.council_id} c={c} />
-          ))}
-        </EpochSection>
-      ) : null}
-
-      {proposals.length > 0 ? (
-        <EpochSection title="Senate proposals">
+      {(councils.length + decisions.length + proposals.length) > 0 ? (
+        <ul
+          style={{
+            marginTop: 16,
+            paddingLeft: 24,
+            listStyle: "none",
+            borderLeft: `0.5px solid ${C.wash}`,
+          }}
+        >
           {proposals.map((p) => (
-            <ProposalCard key={p.proposal_id} p={p} />
+            <li key={p.proposal_id} style={{ padding: "4px 0" }}>
+              <button
+                type="button"
+                onClick={() => onFocus({ kind: "proposal", id: p.proposal_id })}
+                className="c-link"
+                style={{ background: "transparent", border: "none", padding: 0 }}
+              >
+                <span className="c-rubric">PROPOSED</span>{" "}
+                <span>{p.summary || p.proposal_id}</span>
+              </button>
+            </li>
           ))}
-        </EpochSection>
+          {councils.map((c) => (
+            <li key={c.council_id} style={{ padding: "4px 0" }}>
+              <button
+                type="button"
+                onClick={() => onFocus({ kind: "council", id: c.council_id })}
+                className="c-link"
+                style={{ background: "transparent", border: "none", padding: 0 }}
+              >
+                <span className="c-rubric">CONVENED</span> <span>{c.topic}</span>
+              </button>
+              {c.needs_augustus ? (
+                <span
+                  className="c-display-sm c-gold"
+                  style={{ marginLeft: 8, fontSize: 10 }}
+                >
+                  ◆ needs Augustus
+                </span>
+              ) : null}
+            </li>
+          ))}
+          {decisions.map((d) => (
+            <li key={d.decision_id} style={{ padding: "4px 0" }}>
+              <button
+                type="button"
+                onClick={() => onFocus({ kind: "decision", id: d.decision_id })}
+                className="c-link"
+                style={{ background: "transparent", border: "none", padding: 0 }}
+              >
+                <span className="c-rubric">
+                  {d.status === "sealed" ? "SEALED" : "DRAFTED"}
+                </span>{" "}
+                <span>{d.title}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
       ) : null}
-
-      {!decisions.length && !councils.length && !proposals.length ? (
-        <Text size="2" style={{ color: "var(--conclave-ink-dim)" }}>
-          (the swarm hasn't responded yet)
-        </Text>
+      {proc.status === "completed" && proc.summary ? (
+        <div
+          style={{
+            marginTop: 12,
+            padding: "8px 12px",
+            background: C.vellum,
+            borderLeft: `2px solid ${C.gold}`,
+            fontSize: 13,
+          }}
+        >
+          <span className="c-display-sm c-gold">CONCLUDED</span> {proc.summary}
+        </div>
       ) : null}
-    </Card>
+      {/* §3 catchword — italic first-word of the next proclamation,
+       * leading the eye down the codex like a printer's catchword. */}
+      {!isLast && next ? (
+        <div
+          aria-hidden
+          style={{
+            marginTop: 24,
+            paddingTop: 8,
+            borderTop: `0.5px dashed ${C.inkFaded}`,
+            textAlign: "right",
+            fontStyle: "italic",
+            fontSize: 13,
+            color: C.inkFaded,
+          }}
+        >
+          {next.text.split(/\s+/)[0]} …
+        </div>
+      ) : null}
+    </section>
   );
 }
 
-function EpochSection({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
+function FocusedEntity({ target }: { target: EntityRef }) {
+  if (target.kind === "proposal") return <FocusedProposal id={target.id} />;
+  if (target.kind === "decision") return <FocusedDecision id={target.id} />;
+  if (target.kind === "council") return <FocusedCouncil id={target.id} />;
+  return null;
+}
+
+function FocusedProposal({ id }: { id: string }) {
+  const { data } = useSWR<Proposal[]>("/state/proposals", fetcher);
+  const p = data?.find((r) => r.proposal_id === id);
+  if (!p) return <p className="c-faded">Proposal not found.</p>;
+  return <ProposalCartouche proposal={p} />;
+}
+
+function FocusedDecision({ id }: { id: string }) {
+  const { data } = useSWR<Decision[]>("/state/decisions", fetcher);
+  const d = data?.find((r) => r.decision_id === id);
+  if (!d) return <p className="c-faded">Decision not found.</p>;
   return (
-    <Box mt="3">
-      <Heading size="2" className="rubric">{title}</Heading>
-      <Box mt="2">{children}</Box>
-    </Box>
+    <Plate
+      decisionId={d.decision_id}
+      title={d.title}
+      body={d.body}
+      affected={d.affected}
+      status={d.status}
+      sealedAt={d.sealed_at}
+    />
   );
 }
 
-function DecisionRow({ d }: { d: Decision }) {
+function FocusedCouncil({ id }: { id: string }) {
+  const { data: councils } = useSWR<Council[]>("/state/councils", fetcher);
+  const { data: msgs } = useSWR<
+    Array<{ seq: number; from_pod: string; body: string; sent_at: string }>
+  >(`/state/councils/${id}/messages`, fetcher, { refreshInterval: 3000 });
+  const c = councils?.find((r) => r.council_id === id);
+  if (!c) return <p className="c-faded">Council not found.</p>;
   return (
-    <Box className="mb-2">
-      <Flex justify="between" align="baseline">
-        <Text size="2" weight="bold">
-          <EntityLink kind="decision" id={d.decision_id}>{d.title}</EntityLink>
-        </Text>
-        <Badge color={d.status === "sealed" ? "green" : "gray"}>
-          {d.status === "placeholder" ? "pending" : d.status}
-        </Badge>
-      </Flex>
-      {d.body ? (
-        <Box className="mt-1">
-          <Markdown body={d.body} manuscript={false} />
-        </Box>
-      ) : null}
-      {d.affected.length > 0 ? (
-        <Text size="1" style={{ color: "var(--conclave-ink-dim)" }}>
-          affects:{" "}
-          {d.affected.map((id, i) => (
-            <span key={id}>
+    <article>
+      <header style={{ marginBottom: 12 }}>
+        <h3 className="c-display" style={{ margin: 0, fontSize: 14 }}>
+          {c.topic}
+        </h3>
+        {c.needs_augustus ? (
+          <div
+            className="c-display-sm c-gold"
+            style={{ marginTop: 4, fontSize: 11 }}
+          >
+            ◆ needs Augustus
+          </div>
+        ) : null}
+        <div className="c-faded" style={{ fontSize: 12, marginTop: 4 }}>
+          {c.participants.map((podId, i) => (
+            <span key={podId}>
               {i > 0 ? ", " : ""}
-              <EntityLink kind="pod" id={id}>{id}</EntityLink>
+              <EntityLink kind="pod" id={podId}>
+                {podId.slice(0, 12)}
+              </EntityLink>
             </span>
           ))}
-        </Text>
+        </div>
+      </header>
+      {(msgs ?? []).map((m) => (
+        <Phylactery
+          key={m.seq}
+          sender={m.from_pod}
+          body={m.body}
+          sentAt={m.sent_at}
+        />
+      ))}
+      {c.summary && c.status === "closed" ? (
+        <div
+          style={{
+            marginTop: 16,
+            padding: "10px 14px",
+            background: C.vellum,
+            borderTop: `1px solid ${C.gold}`,
+            borderBottom: `1px solid ${C.gold}`,
+          }}
+        >
+          <span className="c-display-sm c-gold">SEALED</span>
+          <p style={{ marginTop: 4 }}>{c.summary}</p>
+          {c.decision_id ? (
+            <EntityLink kind="decision" id={c.decision_id}>
+              {c.decision_id}
+            </EntityLink>
+          ) : null}
+        </div>
       ) : null}
-    </Box>
+    </article>
   );
-}
-
-function ProposalCard({ p }: { p: Proposal }) {
-  return (
-    <Box className="mb-2 border-l-2 pl-3" style={{ borderColor: "var(--conclave-margin)" }}>
-      <Flex gap="2" align="baseline" wrap="wrap">
-        <Badge color="blue">
-          <Glossary term={p.kind}>{p.kind}</Glossary>
-        </Badge>
-        <Badge color="violet">
-          <Glossary term={p.strategy}>{p.strategy}</Glossary>
-        </Badge>
-        <Badge color={outcomeColor(p.outcome)}>{p.outcome}</Badge>
-        <Text size="2" weight="bold">
-          <EntityLink kind="proposal" id={p.proposal_id}>{p.summary}</EntityLink>
-        </Text>
-      </Flex>
-      <Text size="1" style={{ color: "var(--conclave-ink-dim)" }}>
-        proposed by <EntityLink kind="pod" id={p.proposer}>{p.proposer}</EntityLink>
-        {" · "}{p.eligible_voters.length} eligible
-      </Text>
-      <Flex gap="2" wrap="wrap" mt="1">
-        {p.eligible_voters.map((v) => {
-          const b = p.ballots.find((bb) => bb.voter === v);
-          return (
-            <Badge
-              key={v}
-              color={b?.choice === "yes" ? "green" : b?.choice === "no" ? "red" : "gray"}
-            >
-              {v} {b ? `· ${b.choice}` : "· pending"}
-            </Badge>
-          );
-        })}
-      </Flex>
-    </Box>
-  );
-}
-
-function CouncilCard({ c }: { c: Council }) {
-  const { data: msgs } = useSWR<CouncilMessage[]>(
-    `/state/councils/${c.council_id}/messages`,
-    fetcher,
-  );
-  return (
-    <Box className="mb-3 border-l-2 pl-3" style={{ borderColor: "var(--conclave-margin)" }}>
-      <Flex justify="between" align="center">
-        <Flex gap="2" align="baseline" wrap="wrap">
-          <Badge color={c.status === "open" ? "blue" : "gray"}>{c.status}</Badge>
-          {c.private && <Badge color="purple">DM</Badge>}
-          {c.needs_augustus && <Badge color="orange">needs Augustus</Badge>}
-          <Text size="2" weight="bold">
-            <EntityLink kind="council" id={c.council_id}>{c.topic}</EntityLink>
-          </Text>
-        </Flex>
-        <Text size="1" style={{ color: "var(--conclave-ink-dim)" }}>
-          {new Date(c.opened_at).toLocaleTimeString()}
-        </Text>
-      </Flex>
-      <Text size="1" mt="1">
-        {c.participants.map((pp, i) => (
-          <span key={pp}>
-            {i > 0 ? ", " : ""}
-            {pp === "__augustus__" ? (
-              <span style={{ color: "var(--conclave-rubric)" }}>Augustus</span>
-            ) : (
-              <EntityLink kind="pod" id={pp}>{pp}</EntityLink>
-            )}
-          </span>
-        ))}
-      </Text>
-      <Flex direction="column" gap="2" mt="2">
-        {(msgs ?? []).map((m) => (
-          <Phylactery
-            key={m.seq}
-            sender={m.from_pod}
-            body={m.body}
-            sentAt={m.sent_at}
-          />
-        ))}
-        {(msgs ?? []).length === 0 && (
-          <Text size="1" style={{ color: "var(--conclave-ink-dim)" }}>
-            (no messages yet)
-          </Text>
-        )}
-      </Flex>
-      {c.summary ? (
-        <>
-          <Separator size="4" my="2" />
-          <Text size="2">
-            <strong>Summary:</strong> <Linkified text={c.summary} />
-          </Text>
-        </>
-      ) : null}
-    </Box>
-  );
-}
-
-function DigestsPanel({ digests }: { digests: Digest[] }) {
-  return (
-    <Card>
-      <details>
-        <summary className="cursor-pointer outline-none">
-          <Heading size="3" as="h2" className="inline">Hourly digests</Heading>
-          <Text size="1" color="gray" className="ml-2">
-            ({digests.length} hours, click to expand)
-          </Text>
-        </summary>
-        <Text size="1" color="gray" as="div" className="mt-2 mb-2">
-          J3 catch-up — what the swarm did, hour by hour.
-        </Text>
-        <Flex direction="column" gap="1">
-          {digests.map((d) => (
-            <Box key={d.hour_bucket} className="border-l-2 pl-3 py-1 border-amber-700/40">
-              <Text size="1" color="gray">
-                {new Date(d.hour_bucket).toLocaleString()} · {d.item_count} events
-              </Text>
-              <Text size="2" as="div"><Linkified text={d.summary} /></Text>
-            </Box>
-          ))}
-        </Flex>
-      </details>
-    </Card>
-  );
-}
-
-function toRoman(n: number): string {
-  if (n <= 0) return String(n);
-  const numerals: [number, string][] = [
-    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
-    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
-    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
-  ];
-  let out = "";
-  let r = n;
-  for (const [v, s] of numerals) {
-    while (r >= v) {
-      out += s;
-      r -= v;
-    }
-  }
-  return out;
-}
-
-function outcomeColor(o: Proposal["outcome"]): "green" | "red" | "gray" | "blue" {
-  switch (o) {
-    case "approved":
-      return "green";
-    case "rejected":
-    case "expired":
-      return "red";
-    case "open":
-      return "blue";
-    default:
-      return "gray";
-  }
 }
