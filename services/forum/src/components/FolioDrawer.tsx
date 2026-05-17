@@ -125,7 +125,7 @@ export function FolioDrawer() {
             </Dialog.Close>
           </header>
           <div style={{ padding: 16 }}>
-            {top ? <FolioBody ref={top} /> : null}
+            {top ? <FolioBody target={top} /> : null}
           </div>
         </Dialog.Content>
       </Dialog.Portal>
@@ -153,22 +153,22 @@ function renderTitle(ref: EntityRef): string {
   }
 }
 
-function FolioBody({ ref }: { ref: EntityRef }) {
-  switch (ref.kind) {
+function FolioBody({ target }: { target: EntityRef }) {
+  switch (target.kind) {
     case "pod":
-      return <PodFolio podId={ref.id} />;
+      return <PodFolio podId={target.id} />;
     case "proclamation":
-      return <ProclamationFolio seq={ref.id} />;
+      return <ProclamationFolio seq={target.id} />;
     case "decision":
-      return <DecisionFolio decisionId={ref.id} />;
+      return <DecisionFolio decisionId={target.id} />;
     case "proposal":
-      return <ProposalFolio proposalId={ref.id} />;
+      return <ProposalFolio proposalId={target.id} />;
     case "council":
-      return <CouncilFolio councilId={ref.id} />;
+      return <CouncilFolio councilId={target.id} />;
     case "endpoint":
-      return <EndpointFolio compositeId={ref.id} />;
+      return <EndpointFolio compositeId={target.id} />;
     case "app":
-      return <PodFolio podId={ref.id} />;
+      return <PodFolio podId={target.id} />;
   }
 }
 
