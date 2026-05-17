@@ -5,6 +5,7 @@ Spec ref: spec/05-ddd-contexts.md §C3.
 
 from __future__ import annotations
 
+import json
 import logging
 import secrets
 from typing import Any
@@ -176,6 +177,32 @@ class ComsService:
             MessagePosted(council_id=council_id, seq=seq, from_pod=from_pod, body=body),
             COUNCIL_CONTEXT,
         )
+        # Spec/02 Phase 7: when Augustus speaks in a DM, the message
+        # must land in the *recipient's inbox* (a core-NATS broadcast),
+        # not just in the JetStream events stream the Forum consumes.
+        # The pod's bootstrap subscribes to conclave.inbox.<pod_id>;
+        # without this fan-out, J7 (course-correct) is broken end-to-end.
+        if from_pod == AUGUSTUS:
+            recipient = next(
+                (p for p in participants if p != AUGUSTUS), None
+            )
+            if recipient is not None:
+                inbox_body = json.dumps(
+                    {
+                        "event_type": "DirectMessageFromUser",
+                        "pod_id": recipient,
+                        "from": AUGUSTUS,
+                        "council_id": council_id,
+                        "seq": seq,
+                        "body": body,
+                    }
+                ).encode()
+                try:
+                    await self._bus.nc.publish(
+                        f"conclave.inbox.{recipient}", inbox_body
+                    )
+                except Exception:
+                    log.exception("DM inbox fan-out to %s failed", recipient)
         return seq
 
     async def close_council(
