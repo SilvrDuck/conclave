@@ -66,12 +66,20 @@ Crosscutting (open as drawer / page, never tab):
 A single **bandeau** across the top, 40px tall:
 
 - **Wordmark** at left: `CONCLAVE` in Cinzel small-caps, 14px.
-- **Current numeral** in the centre: `№ III` in Cormorant Garamond
+- **Current numeral** in the centre: `№ III` in EB Garamond
   semibold, with the proclamation's first 60 characters trailing in
   italic, ellipsis-truncated. Click = jump to that proclamation page.
+- **`P` wax seal** to the right of the numeral once the conclave is
+  non-empty: opens a single-textarea proclamation dialog so J1 is
+  reachable from every perspective without leaving the current page.
+  Hidden on the Glance empty state (where the torn-leaf insert
+  is the only affordance).
 - **Perspective toggle** at right: four-segment Radix `ToggleGroup`
   reading `Glance · Witness · Try · Direct`. Active segment shows a
   gold-leaf hairline beneath; inactive segments are faded-ink.
+- **Inbox bell** for J8/J9: a 16px scribal mark that gains a cinnabar
+  dot when there are pending imperial ballots or stuck things; click
+  → opens `/inbox`.
 - **Status dot** + **Reset** at far right: one parchment dot
   (verdigris / amber / cinnabar) for "system breathing / something
   blocked / something dead"; a `Reset` ink-link triggers `POST
@@ -104,7 +112,7 @@ Single full-bleed pane.
   Cinnabar is the only colour the Tray is allowed to use.
 - **Empty state** (§1 of 08-v2-acceptance): the canvas is *empty*,
   not zero-counted. A single inline proclamation field — a torn-leaf
-  insert in Cormorant Garamond 20px — sits vertically centred on
+  insert in EB Garamond italic 20px — sits vertically centred on
   parchment with the legend "*Speak, and the conclave begins.*" No
   first-run wizard, no "0 pods", no counters.
 
@@ -126,8 +134,8 @@ real page:
   the first letter of the proclamation body. **This is the only
   place in the app where a drop cap appears.** A drop cap means "a
   proclamation begins here."
-- **Scribal numeral** in the gutter: `№ III` in Cormorant Garamond
-  semibold.
+- **Scribal numeral** in the gutter: `№ III` in EB Garamond
+  semibold with lining numerals.
 - **Body** in EB Garamond 16px, justified.
 - **Indented descendants** beneath each proclamation: every council,
   proposal, decision, image-swap that descended from it, each a
@@ -174,6 +182,30 @@ No screenshots. No iframe thumbnails. The plaque is the affordance.
 
 ---
 
+## §4.5 — `/inbox` (J8 + J9 catch-all)
+
+A single full-width page reachable from the Bandeau's inbox bell.
+Two stacked sections — never tabs.
+
+**Pending ballots.** Vertical list of **Proposal Cartouches** (§6.3)
+that name Augustus as an eligible voter (i.e. the rare imperial
+ballots: exile, charter overhaul, completion). Each Cartouche
+renders inline with three wax seals at the foot — `A`ye, `N`ay,
+`—` abstain. Clicking a seal posts `CastBallot` and folds the
+Cartouche into a faded "*voted*" state without leaving the page.
+
+**Stuck things.** Below ballots, the Stuck Tray contents rendered
+full-page rather than collapsed: one row per stuck thing (pod,
+proposal past deadline, silent council) with one Cinzel verb-button.
+Same data as the Glance Stuck Tray, presented as a list rather than
+a fold-out — for the catch-up case where the architect explicitly
+wants to clear the backlog.
+
+The bell on the Bandeau lights cinnabar whenever either section has
+contents.
+
+---
+
 ## §5 — The Direct perspective
 
 Two stacked sections plus a persistent right drawer.
@@ -200,20 +232,41 @@ miniature plates when it renders a tool call. "*Thinking since
 
 ## §6 — Components
 
-The ten components below are the entire surface vocabulary. New
+The twelve components below are the entire surface vocabulary. New
 surfaces compose these; no one-off card shapes.
 
 1. **Bandeau** — the 40px top bar (§1). Cinzel wordmark, scribal
-   numeral, perspective toggle, single health dot, Reset link.
+   numeral, optional `P` wax seal, perspective toggle, inbox bell,
+   single health dot, Reset link.
 
-2. **Cartouche** — the pod node on the Glance graph. Oval parchment
+2. **Pod Cartouche** — the pod node on the Glance graph and the
+   inline pod-reference chip used in transcripts. Oval parchment
    frame, display-role in Cinzel small-caps, 12px **state pip** at
-   top-right (verdigris running / cinnabar stuck / wash
-   not-yet-spawned), 24×6 endpoint-traffic sparkline at the bottom.
+   top-right, 24×6 endpoint-traffic sparkline at the bottom (graph
+   form only). State pip colours:
+   - **verdigris** — `runtime_status: running` and `agent_state` in
+     `idle` or `thinking`
+   - **cinnabar** — `agent_state: stuck` OR a vote on this pod has
+     passed its deadline
+   - **wash** — `runtime_status: not_yet_spawned` (placeholder)
+   - **faded ink** — `runtime_status: stopped` (container exited but
+     not exiled — distinct from cinnabar `stuck`)
    Dashed outline = placeholder pod; solid = admitted; crossed-through
    = exiled. The simulator pod has the gold hairline above-and-below.
 
-3. **Phylactery** — speech-scroll message bubble for council
+3. **Proposal Cartouche** — the senate proposal card (renders in
+   Witness right column, /inbox, and inline in the Glance Roll on
+   click). Distinct vocabulary from Pod Cartouche: rectangular
+   plate, **proposal-kind ribbon** in Cinzel small-caps at top
+   (`ADMISSION` / `EXILE` / `IMAGE·SWAP` / `CONTRACT·CHANGE` /
+   `COMPLETION` / `CHARTER·OVERHAUL`), one-line summary in EB
+   Garamond body, payload preview (for `image_swap` shows
+   `old:image:tag → new:image:tag` in mono; for `contract_change`
+   shows the affected endpoints list), then the Ballot Strip (§6.7),
+   then deadline-countdown in mono. Strategy is on the Ballot Strip,
+   *kind* is on the ribbon.
+
+4. **Phylactery** — speech-scroll message bubble for council
    messages, DMs, and any agent quotation. Sender heraldry is a
    16px deterministic two-letter monogram in Cinzel on a coloured
    field; the colour is **the pod's identity colour** and is the
@@ -221,7 +274,7 @@ surfaces compose these; no one-off card shapes.
    in EB Garamond. Augustus's voice uses gold ink and a *square*
    frame instead of a scroll.
 
-4. **Plate** — the decision card. 18th-century scientific-journal
+5. **Plate** — the decision card. 18th-century scientific-journal
    plate: 1-px rule top + bottom, decision title in Cinzel,
    body in EB Garamond, "*Sealed V·MMXXVI*" footer in scribal
    numerals, **affected-pods row** below the body as a tight strip
@@ -229,38 +282,51 @@ surfaces compose these; no one-off card shapes.
    `_council pending_` in italic faded-ink — the empty-tablet
    anti-pattern from v1 is now visually unmistakable.
 
-5. **Roll entry** — one line of the Glance right-rail and Witness
+6. **Roll entry** — one line of the Glance right-rail and Witness
    left-column digest. Timestamp · rubric verb · summary. No icons.
 
-6. **Ballot Strip** — the senate cartouche's voting row. One pip per
-   eligible voter (filled monogram if cast, hollow circle if
+7. **Ballot Strip** — the proposal cartouche's voting row. One pip
+   per eligible voter (filled monogram if cast, hollow circle if
    pending, em-dash if abstain, wash-grey if sortition-undrawn).
    Strategy badge to the left in Cinzel small-caps:
    `MAJORITY` / `SUPERMAJORITY` / `CONSENSUS·OMNIUM` / `SORTITION`.
    Deadline countdown in mono.
 
-7. **Folio drawer** — the right-side Radix `Sheet` that opens
+8. **Folio drawer** — the right-side Radix `Sheet` that opens
    whenever a domain entity is clicked. Three vertical bands:
    identity → live transcript → neighbours. **Neighbours** is the
    navigable-graph affordance: each line is a clickable route to
    another folio. The drawer can be deep-stacked (one folio opening
-   another) with a back chevron — same UX pattern as the v1
-   PeekDrawer the rebuild replaces.
+   another) with a back chevron. **Every domain entity has a folio
+   shape**: pod (identity + transcript + neighbours), decision
+   (title + body + affected pods), council (topic + thread +
+   summary), proposal (Proposal Cartouche + ballots + linked
+   decision), proclamation (drop-cap body + descendants),
+   endpoint (`method path` header + observed callers + annotation
+   body), app/service (Plaque body + endpoint list + owning pod
+   link).
 
-8. **Marginalia rail** — the 8px-wide gutter beside any long body
+9. **Marginalia rail** — the 8px-wide gutter beside any long body
    (charter, decision body, council summary) where cross-references
    appear as small Cinzel scribal numerals. Click → open the
    referenced entity in the drawer. **This is where the manuscript
-   skin earns its keep**: the §9 graph-of-everything is visible
+   skin earns its keep**: the §0 graph-of-everything is visible
    without cluttering the page.
 
-9. **Wax seal** — primary action button. Cinnabar disc, 32px, with
-   a single Cinzel letter embossed (`P` for `Proclaim`, `S` for
-   `Seal edit`, `O` for `Open app`, `A`/`N` for `Aye`/`Nay`
-   ballots). **Used sparingly** — at most one wax seal per surface.
-   Secondary actions are ink-link text in compass-blue.
+10. **Wax seal** — primary action button. Cinnabar disc, 32px, with
+    a single Cinzel letter embossed (`P` for `Proclaim`, `S` for
+    `Seal edit`, `O` for `Open app`, `A`/`N` for `Aye`/`Nay`
+    ballots). **Used sparingly** — at most one wax seal per surface.
+    Secondary actions are ink-link text in compass-blue.
 
-10. **Stuck Tray** (§2). The only component allowed to use cinnabar
+11. **Charter Editor** — Direct perspective's top section. A pod
+    chooser strip (a horizontal row of Pod Cartouches, click to
+    select) above a serif diff view: original text faded-ink, edits
+    in primary ink. EB Garamond 15px. One `S` wax seal at the foot
+    commits the edit via `POST /commands {kind: EditCharter}`. The
+    chooser strip is a re-use of Pod Cartouche, not a one-off.
+
+12. **Stuck Tray** (§2). The only component allowed to use cinnabar
     as a fill. Verb-buttons in Cinzel small-caps.
 
 ---
@@ -296,15 +362,17 @@ Three faces. Restraint is the design.
   - Never in chrome.
 
 **Scribal numerals** (`№ III`, `V·MMXXVI`) appear only on
-proclamation numerals and decision-sealed dates. Everywhere else,
-Arabic numerals in mono. *If you can't tell what a number means at
-a glance, the design fails.*
+proclamation numerals and decision-sealed dates and are set in EB
+Garamond semibold with lining figures. Everywhere else, Arabic
+numerals in mono. *If you can't tell what a number means at a
+glance, the design fails.*
 
 **Sizes — discontinuous, deliberate**:
 12 marginalia · 13 Roll summary · 14 default body · 15 charter ·
-16 proclamation body · 20 cartouche title · 28 page heading. **No
-size between 28 and 56** — the scale is intentionally broken to
-mark "this is a heading".
+16 proclamation body · 20 page heading (EB Garamond semibold) ·
+20 scribal numeral. **Cinzel never exceeds 14px.** No display
+typography larger than 20px anywhere — this is a record, not a
+poster.
 
 Line-height: 1.45 serif body · 1.2 Cinzel · 1.5 mono. 8-px spacing
 scale (8/16/24/32/64), borrowed from Linear.
@@ -313,23 +381,23 @@ scale (8/16/24/32/64), borrowed from Linear.
 
 ## §8 — Palette
 
-Eight colours. Every hue carries a semantic.
+Nine colours. Every hue carries a semantic; eight are
+content/structure, the ninth (Wash) is the disabled state.
 
 | Hex | Name | Role |
 |---|---|---|
 | `#F4ECD8` | Parchment | Primary surface, page background |
 | `#E8DCC0` | Vellum | Secondary surface — drawer fill, cartouche fill |
 | `#1F1A14` | Iron-gall ink | Primary text, primary stroke |
-| `#6B5E48` | Faded ink | Secondary text, hairline rules, axis-less sparkline |
+| `#6B5E48` | Faded ink | Secondary text, hairline rules, axis-less sparkline, `stopped` pod pip |
 | `#A48143` | Gold leaf | **Accent only** — proclamation numerals, sealed-decision rule, simulator's hairline, Augustus's DM ink. Never fill, never hover state. |
 | `#3B5A3C` | Verdigris | Running / healthy state pip; OTel call-edge ink-bloom |
 | `#7A1F1F` | Cinnabar | **The only red** — stuck, deadline-passed, exile vote, Stuck-Tray verb buttons, Reset confirmation |
 | `#1F3D4A` | Compass blue | **The only blue** — clickable cross-references, ink-links. Nothing decorative is blue. |
 | `#C8BFA5` | Wash | Disabled, sortition-undrawn pip, dashed-outline placeholders, sparkline normal-range band |
 
-Nine colours total (counted wash separately — it is the disabled
-shade). Dark mode is `#1A1714` board inverted to ink-on-board with
-the same gold/verdigris/cinnabar/blue.
+Dark mode is `#1A1714` board inverted to ink-on-board with the
+same gold/verdigris/cinnabar/blue.
 
 ---
 
@@ -378,15 +446,15 @@ opacity fade. Stuck-pip pulse becomes a static cinnabar fill.
 
 | Job | Surface that answers it |
 |---|---|
-| **J1 — proclaim** | Glance empty state torn-leaf insert; in steady state, a "P" wax seal on the Bandeau's right edge (Direct route handles long-form proclamations too). |
-| **J2 — glance health** | Bandeau status dot + Glance graph state pips + Stuck Tray. 2-second read. |
-| **J3 — catch up** | Witness Codex: every named event indented under its proclamation. Hourly activity digest renders as a folded "*overnight chapter*" group at the top. Sub-minute read because every entry is a one-sentence Roll line. |
+| **J1 — proclaim** | Glance empty state torn-leaf insert; in steady state, the Bandeau's `P` wax seal (§1) opens a single-textarea proclamation dialog from any perspective. |
+| **J2 — glance health** | Bandeau status dot + Glance Pod-Cartouche state pips + Stuck Tray. 2-second read. |
+| **J3 — catch up** | Witness Codex: every named event indented under its proclamation. The hourly Activity Digester output (observer/reactors/digester.py) surfaces as a folded "*overnight chapter*" Roll-entry group at the head of each day in the Codex. Sub-minute read because every entry is a one-sentence Roll line. |
 | **J4 — watch one think** | Folio drawer band 2 (live OpenLLMetry stream), or Direct perspective's persistent right drawer when a pod is selected. Tool calls render as miniature Plates inline. |
-| **J5 — witness meetings** | Witness right column renders a council thread as Phylacteries with sender monograms; closed councils show their summary in a framed Plate at the foot. |
-| **J6 — try app** | Try perspective: one Plaque per public pod, hostname + endpoint sparkline + `Open` ink-link. |
-| **J7 — course-correct** | Direct perspective: per-pod DM thread + Charter Editor. The persistent right drawer's live stream lets Augustus see the nudge land. |
-| **J8 — imperial vote** | `/inbox` lists pending ballots as Plates with full rationale; selecting one opens its Cartouche with strategy / eligible / deadline / rationale and `A` / `N` / `—` wax seals. |
-| **J9 — detect stuck** | Stuck Tray on Glance (cinnabar pulse on cartouche pip is the in-graph signal). One-tap Tray verb-buttons (`NUDGE` / `RESTART` / `FORCE·CLOSE`) hit Observer's command endpoints. |
+| **J5 — witness meetings** | Witness right column renders a council thread as Phylacteries with sender monograms; closed councils show their summary in a framed Plate at the foot. The `needs_augustus` flag (when a council requested imperial input) renders as a gold-leaf hairline ribbon under the council topic. |
+| **J6 — try app** | Try perspective: one Plaque per public pod, hostname + endpoint sparkline + `O` wax seal opens the deployed app in a new tab. Clicking the Plaque body (not the seal) opens the pod's folio drawer with its endpoint list and owning-pod links — endpoints are first-class navigable entities. |
+| **J7 — course-correct** | Direct perspective: per-pod DM thread + Charter Editor (§6.11). The persistent right drawer's live stream lets Augustus see the nudge land. |
+| **J8 — imperial vote** | `/inbox` (§4.5) lists pending ballots as Proposal Cartouches with full rationale; each Cartouche carries `A` / `N` / `—` wax seals inline. |
+| **J9 — detect stuck** | Stuck Tray on Glance (cinnabar pulse on Pod-Cartouche pip is the in-graph signal) + `/inbox` "Stuck things" full-page list. One-tap Tray verb-buttons (`NUDGE` / `RESTART` / `FORCE·CLOSE`) hit Observer's command endpoints. |
 
 ---
 
@@ -419,9 +487,9 @@ What the rebuild **throws away**:
       kanban task, not a code change.
 - [ ] **Parchment by default.** `localhost:5173` opens with the §8
       palette as the body background. No leftover slate-900 chrome.
-- [ ] **All eight JTBD vignettes have an answer.** §10 maps every J
-      to a surface; each row is traversable end-to-end on the
-      running stack.
+- [ ] **All nine JTBD vignettes (J1–J9) have an answer.** §10 maps
+      every J to a surface; each row is traversable end-to-end on
+      the running stack.
 - [ ] **Click-through traverses through `/api`.** PR #91's
       relative-fetcher pattern stays; no absolute observer URLs.
 - [ ] **Reset works from the Forum.** The Bandeau's Reset link
