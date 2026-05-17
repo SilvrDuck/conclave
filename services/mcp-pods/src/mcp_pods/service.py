@@ -5,10 +5,12 @@ Spec ref: spec/05-ddd-contexts.md §C6.
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
 import secrets
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -20,10 +22,11 @@ from conclave_core.events import (
     PodContainerStarted,
     PodImageSwapped,
     PodRenamed,
+    PodsNuked,
 )
 from conclave_core.models import ImageStrategy
 
-from mcp_pods.spawner import SpawnError, mint_pod_id, spawn_pod
+from mcp_pods.spawner import PODS_DIR, SpawnError, mint_pod_id, spawn_pod
 from mcp_pods.traefik import remove_rule, write_rule
 
 log = logging.getLogger("mcp-pods.service")
@@ -40,6 +43,11 @@ class PodsService:
     def __init__(self, *, pool: asyncpg.Pool, bus: Bus) -> None:
         self._pool = pool
         self._bus = bus
+        # Serialise NukePods invocations within the process. NATS can
+        # redeliver if the handler exceeds ack_wait (default 30s) and
+        # docker rm -f on a populated swarm can easily push past that.
+        # Also guards against the architect spamming Reset from the UI.
+        self._nuke_lock = asyncio.Lock()
 
     async def register_self(
         self,
@@ -243,6 +251,74 @@ class PodsService:
             remove_rule(dynamic_dir=traefik_dynamic_dir(), pod_id=pod_id)
         except OSError:
             log.exception("failed to remove Traefik rule for %s", pod_id)
+
+    async def on_nuke_pods(self, _data: dict[str, Any]) -> None:
+        """ResetState reactor — stop every running conclave-pod-*
+        container, remove every rendered pods/pod-*/ dir, drop any
+        per-pod Traefik rule, then emit PodsNuked so operator can
+        truncate the DB.
+
+        Idempotent on already-clean state (no pods left still emits
+        PodsNuked(nuked_count=0)). Serialised by _nuke_lock so NATS
+        redeliveries don't run two teardowns in parallel."""
+        async with self._nuke_lock:
+            log.info("NukePods: tearing down all pod containers + dirs")
+            # 1. list every container that matches the pod naming scheme.
+            proc = await asyncio.create_subprocess_exec(
+                "docker", "ps", "-a", "--filter", "name=conclave-pod-",
+                "--format", "{{.Names}}",
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=15)
+            except TimeoutError:
+                proc.kill()
+                await proc.wait()
+                log.error("NukePods: docker ps timed out")
+                return
+            containers = [n for n in stdout.decode().splitlines() if n.strip()]
+            # 2. docker rm -f each, in parallel — sequential rm of N pods
+            #    risks exceeding NATS ack_wait. asyncio.gather caps the
+            #    end-to-end wait at the slowest single rm.
+            async def _rm(name: str) -> None:
+                try:
+                    p = await asyncio.create_subprocess_exec(
+                        "docker", "rm", "-f", name,
+                        stdout=asyncio.subprocess.DEVNULL,
+                        stderr=asyncio.subprocess.PIPE,
+                    )
+                    _, err = await asyncio.wait_for(p.communicate(), timeout=30)
+                    if p.returncode != 0:
+                        log.warning(
+                            "docker rm -f %s rc=%s: %s",
+                            name, p.returncode, err.decode(errors='replace')[:200],
+                        )
+                except TimeoutError:
+                    log.error("docker rm -f %s timed out", name)
+            if containers:
+                await asyncio.gather(*(_rm(c) for c in containers))
+            # 3. remove rendered pods/pod-*/ dirs. We run as root inside the
+            #    container so this works regardless of host UID; the dirs
+            #    were owned by the host user (via _chown_to_host) so future
+            #    `rm -rf` from the host also works.
+            if PODS_DIR.exists():
+                for child in PODS_DIR.iterdir():
+                    if child.name.startswith("pod-"):
+                        shutil.rmtree(child, ignore_errors=True)
+            # 4. clear per-pod Traefik rules.
+            dyn = traefik_dynamic_dir()
+            if dyn.exists():
+                for rule in dyn.glob("pod-*.yml"):
+                    try:
+                        rule.unlink()
+                    except OSError:
+                        log.exception("failed to remove Traefik rule %s", rule)
+            # 5. signal operator that it's safe to truncate the DB.
+            await self._bus.publish_event(
+                PodsNuked(nuked_count=len(containers)), PODS_CONTEXT,
+            )
+            log.info("NukePods done — %d container(s) removed", len(containers))
 
     async def on_restart_pod(self, data: dict[str, Any]) -> None:
         """ATAM Op4 — restart the named pod's container.

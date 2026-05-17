@@ -1,9 +1,8 @@
 """OperatorService — owns proclamations + Forum command fanout.
 
 Lives in the observer process. Translates Forum POSTs into bus commands
-routed to the owning context's process, except `IssueProclamation` which
-the operator handles itself (writes to `operator.proclamations` and
-emits `ProclamationIssued`).
+routed to the owning context's process, except `IssueProclamation` and
+`ResetState` which the operator handles itself.
 """
 
 from __future__ import annotations
@@ -12,11 +11,40 @@ import logging
 from typing import Any
 
 import asyncpg
-from conclave_core import Bus, ProclamationIssued, command_subject
+from conclave_core import (
+    Bus,
+    PodsNuked,
+    ProclamationIssued,
+    StateReset,
+    command_subject,
+    event_subject,
+)
 
 log = logging.getLogger("observer.operator")
 
 OPERATOR_CONTEXT = "operator"
+
+# Tables that ResetState truncates. Listed here (not derived from
+# information_schema) so the wipe is an explicit, reviewable contract —
+# adding a new domain table without thinking about reset semantics
+# should fail loudly when the team notices stale rows post-reset, not
+# silently get caught by an introspecting truncate.
+RESET_TABLES = (
+    "council.councils",
+    "council.messages",
+    "decisions.decisions",
+    "operator.proclamations",
+    "senate.proposals",
+    "senate.ballots",
+    "pods.pods",
+    "pods.spawns",
+    "observer.pod_state",
+    "observer.endpoints",
+    "observer.calls",
+    "observer.activity",
+    "observer.digests",
+    "observer.agent_turns",
+)
 
 
 class OperatorService:
@@ -30,11 +58,23 @@ class OperatorService:
         # Listen for our own IssueProclamation commands posted by the
         # CommandRouter; we don't expose a direct method on operator
         # because the command/event flow should be uniform.
-        subject = command_subject("IssueProclamation", OPERATOR_CONTEXT)
         await self._bus.subscribe(
-            subject,
+            command_subject("IssueProclamation", OPERATOR_CONTEXT),
             self._on_issue_proclamation,
             durable="observer-operator-issue-proclamation",
+        )
+        await self._bus.subscribe(
+            command_subject("ResetState", OPERATOR_CONTEXT),
+            self._on_reset_state,
+            durable="observer-operator-reset-state",
+        )
+        # PodsNuked tells us mcp-pods has stopped & removed every pod
+        # container; only then is the DB truncate safe (no stragglers
+        # writing into freshly-empty tables).
+        await self._bus.subscribe(
+            event_subject(PodsNuked, "pods"),
+            self._on_pods_nuked,
+            durable="observer-operator-pods-nuked",
         )
 
     # ── Forum command translation (called by CommandRouter) ─────────────
@@ -57,10 +97,50 @@ class OperatorService:
                 await self._bus.publish_command("CastBallot", payload, "senate")
             case "RestartPod":
                 await self._bus.publish_command("RestartPod", payload, "pods")
+            case "ResetState":
+                await self._bus.publish_command(
+                    "ResetState", payload, OPERATOR_CONTEXT
+                )
             case _:
                 raise ValueError(f"unknown Forum command kind: {kind}")
 
     # ── Bus handlers ────────────────────────────────────────────────────
+
+    async def _on_reset_state(self, _data: dict[str, Any]) -> None:
+        """Tell mcp-pods to remove every pod container + rendered dir.
+        The DB truncate happens in _on_pods_nuked once mcp-pods reports
+        completion. Splitting the work avoids racing pod registrations
+        against an empty pods.pods table."""
+        log.info("ResetState: requesting NukePods from mcp-pods")
+        await self._bus.publish_command("NukePods", {}, "pods")
+
+    async def _on_pods_nuked(self, data: dict[str, Any]) -> None:
+        """mcp-pods finished tearing down every pod. Truncate every
+        domain table in one transaction, then emit StateReset so the
+        Forum and any future observers can refresh their views.
+
+        Race note: ObservationService is a separate subscriber on
+        events.>. Stale events that landed before NukePods but are
+        still being projected may insert rows into observer.pod_state
+        / observer.activity after this truncate. The window is small
+        (typically <1s on a quiescent stack) and self-heals on the
+        next ResetState. Acceptable for an admin op; documented in
+        spec/08 §14."""
+        log.info(
+            "PodsNuked nuked_count=%d — truncating domain tables",
+            data["nuked_count"],
+        )
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                # RESTART IDENTITY so the proclamation seq counter goes
+                # back to 1 — the next pass really is "epoch I" again.
+                # No CASCADE: the only FKs are intra-schema, and both
+                # parents and children are in RESET_TABLES.
+                await conn.execute(
+                    f"TRUNCATE {', '.join(RESET_TABLES)} RESTART IDENTITY"
+                )
+        await self._bus.publish_event(StateReset(), OPERATOR_CONTEXT)
+        log.info("StateReset emitted")
 
     async def _on_issue_proclamation(self, data: dict[str, Any]) -> None:
         text = data.get("text", "").strip()

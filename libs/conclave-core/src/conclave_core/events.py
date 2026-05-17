@@ -74,6 +74,14 @@ class CharterEdited(DomainEvent):
     by: str  # "__augustus__" or a pod_id
 
 
+class StateReset(DomainEvent):
+    """All read-models and pod containers have been wiped. Architect
+    triggered a fresh start from the Forum (or via the HTTP API).
+    Emitted by operator after mcp-pods has confirmed pod teardown."""
+
+    event_type: Literal["StateReset"] = "StateReset"
+
+
 # ─── Senate context ────────────────────────────────────────────────────────
 
 
@@ -186,6 +194,15 @@ class PodImageSwapped(DomainEvent):
     old_image: str
     new_image: str
     new_mode: str
+
+
+class PodsNuked(DomainEvent):
+    """mcp-pods finished stopping and removing every pod container and
+    every rendered pods/<id>/ dir in response to a NukePods command.
+    Signals operator that it's safe to truncate the DB."""
+
+    event_type: Literal["PodsNuked"] = "PodsNuked"
+    nuked_count: int
 
 
 # ─── Observation context ───────────────────────────────────────────────────
