@@ -9,6 +9,7 @@
 
 import * as Dialog from "@radix-ui/react-dialog";
 import { Cross1Icon, ChevronLeftIcon } from "@radix-ui/react-icons";
+import { useEffect, useRef, useState } from "react";
 import useSWR from "swr";
 import {
   fetcher,
@@ -221,27 +222,32 @@ function PodFolio({ podId }: { podId: string }) {
         </Section>
       ) : null}
       {turns && turns.length > 0 ? (
-        <Section title="Thinking">
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {turns.slice(0, 12).map((t) => (
-              <li
-                key={t.turn_id}
-                className="c-mono"
-                style={{ padding: "2px 0", fontSize: 12 }}
-              >
-                <span className="c-faded">{formatHHMM(t.started_at)}</span>{" "}
-                turn {t.turn_id.slice(0, 8)}{" "}
-                {t.tokens_in != null ? (
-                  <>
-                    <span className="c-faded">·</span> {t.tokens_in}/{t.tokens_out} tok
-                  </>
-                ) : (
-                  <span className="c-faded">…</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </Section>
+        <>
+          <Section title="Now thinking">
+            <LiveTranscript podId={podId} turnId={turns[0].turn_id} />
+          </Section>
+          <Section title="Recent turns">
+            <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+              {turns.slice(0, 12).map((t) => (
+                <li
+                  key={t.turn_id}
+                  className="c-mono"
+                  style={{ padding: "2px 0", fontSize: 12 }}
+                >
+                  <span className="c-faded">{formatHHMM(t.started_at)}</span>{" "}
+                  turn {t.turn_id.slice(0, 8)}{" "}
+                  {t.tokens_in != null ? (
+                    <>
+                      <span className="c-faded">·</span> {t.tokens_in}/{t.tokens_out} tok
+                    </>
+                  ) : (
+                    <span className="c-faded">…</span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </Section>
+        </>
       ) : null}
       {podEndpoints.length > 0 ? (
         <Section title="Endpoints">
@@ -463,4 +469,104 @@ function formatHHMM(iso: string): string {
   } catch {
     return iso;
   }
+}
+
+/** Live transcript for an agent turn (kanban #90). Fetches the
+ * existing deltas once on mount, then subscribes to SSE to append
+ * AgentTextDelta events as they land. */
+function LiveTranscript({ podId, turnId }: { podId: string; turnId: string }) {
+  const [body, setBody] = useState<string>("");
+  const lastSeqRef = useRef<number>(0);
+  const bodyRef = useRef<string>("");
+
+  // Initial catch-up.
+  useEffect(() => {
+    let cancelled = false;
+    setBody("");
+    bodyRef.current = "";
+    lastSeqRef.current = 0;
+    (async () => {
+      try {
+        const deltas = await fetcher<
+          Array<{ seq: number; body: string; occurred_at: string }>
+        >(`/state/pods/${podId}/turns/${turnId}/deltas?since=0`);
+        if (cancelled) return;
+        let acc = "";
+        let max = 0;
+        for (const d of deltas) {
+          acc += d.body;
+          if (d.seq > max) max = d.seq;
+        }
+        bodyRef.current = acc;
+        lastSeqRef.current = max;
+        setBody(acc);
+      } catch {
+        // SSE will fill it in shortly.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [podId, turnId]);
+
+  // SSE subscription — pull AgentTextDelta off the global stream
+  // and filter to this (pod, turn).
+  useEffect(() => {
+    const BASE = (import.meta.env.VITE_OBSERVER_URL as string | undefined) ?? "/api";
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(`${BASE}/stream`);
+    } catch {
+      return;
+    }
+    const onDomain = (ev: MessageEvent) => {
+      try {
+        const data = JSON.parse(ev.data);
+        if (
+          data.event_type !== "AgentTextDelta" ||
+          data.pod_id !== podId ||
+          data.turn_id !== turnId
+        ) {
+          return;
+        }
+        if (typeof data.seq === "number" && data.seq <= lastSeqRef.current) {
+          return; // dedup against the initial catch-up
+        }
+        bodyRef.current += data.body ?? "";
+        lastSeqRef.current = data.seq;
+        setBody(bodyRef.current);
+      } catch {
+        /* malformed payload */
+      }
+    };
+    es.addEventListener("domain", onDomain);
+    return () => {
+      es?.close();
+    };
+  }, [podId, turnId]);
+
+  if (!body) {
+    return (
+      <p className="c-faded" style={{ fontStyle: "italic" }}>
+        no transcript yet — the turn hasn't started, or it's already finished.
+      </p>
+    );
+  }
+  return (
+    <pre
+      style={{
+        margin: 0,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        fontFamily: "var(--f-body)",
+        fontSize: 13,
+        lineHeight: 1.5,
+        maxHeight: 360,
+        overflowY: "auto",
+        padding: "4px 0",
+      }}
+    >
+      {body}
+    </pre>
+  );
 }

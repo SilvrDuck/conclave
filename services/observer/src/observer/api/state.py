@@ -418,6 +418,37 @@ async def list_pod_turns(
     ]
 
 
+@router.get("/pods/{pod_id}/turns/{turn_id}/deltas")
+async def list_turn_deltas(
+    request: Request, pod_id: str, turn_id: str, since: int = 0
+) -> list[dict[str, Any]]:
+    """Stream of text deltas for one agent turn (kanban #90). The
+    Forum's Pod folio fetches once with since=0 on open, then catches
+    up via SSE — but a `since` query lets callers resume past an SSE
+    drop."""
+    _validate_pod_id(pod_id)
+    pool = request.app.state.observer.pool
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """SELECT seq, body, occurred_at
+                 FROM observer.agent_turn_deltas
+                WHERE pod_id = $1 AND turn_id = $2 AND seq > $3
+                ORDER BY seq ASC
+                LIMIT 2000""",
+            pod_id,
+            turn_id,
+            since,
+        )
+    return [
+        {
+            "seq": r["seq"],
+            "body": r["body"],
+            "occurred_at": r["occurred_at"].isoformat(),
+        }
+        for r in rows
+    ]
+
+
 @router.get("/traces")
 async def list_traces(
     request: Request, pod_id: str, limit: int = 20

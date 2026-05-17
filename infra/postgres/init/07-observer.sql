@@ -71,6 +71,21 @@ CREATE TABLE IF NOT EXISTS agent_turns (
     PRIMARY KEY (pod_id, turn_id)
 );
 
+-- Per-frame text deltas streamed during an agent turn (kanban #90).
+-- The Forum's Pod folio live-transcript subscribes via /api/stream and
+-- catches up on missed deltas via GET /state/pods/<id>/turns/<turn>/deltas.
+CREATE TABLE IF NOT EXISTS agent_turn_deltas (
+    pod_id       TEXT NOT NULL,
+    turn_id      TEXT NOT NULL,
+    seq          INT NOT NULL,
+    body         TEXT NOT NULL,
+    occurred_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (pod_id, turn_id, seq)
+);
+
+CREATE INDEX IF NOT EXISTS agent_turn_deltas_idx
+    ON agent_turn_deltas(pod_id, turn_id, seq);
+
 -- Performance indexes (kanban #22). Without these:
 --   - pod_state.last_seen scans are O(N pods) per HealthWatcher tick
 --   - calls.observed_at scans the whole table for the live-graph view

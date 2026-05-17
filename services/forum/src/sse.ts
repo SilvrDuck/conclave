@@ -42,6 +42,7 @@ const EVENT_TYPE_TO_KEYS: Record<string, string[]> = {
   PodHealthChanged: ["/state/pods"],
   EndpointObserved: ["/state/endpoints"],
   EndpointAnnotated: ["/state/endpoints", "/state/activity"],
+  AgentTextDelta: [],  // not a SWR-mutate target — Folio drawer subscribes directly
 };
 
 export function useDomainStream(): void {

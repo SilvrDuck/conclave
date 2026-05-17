@@ -167,6 +167,20 @@ class ObservationService:
                             WHERE pod_id = $1""",
                         data["pod_id"],
                     )
+            case "AgentTextDelta":
+                # Per-frame delta of agent stdout text (kanban #90).
+                async with self._pool.acquire() as conn:
+                    await conn.execute(
+                        """INSERT INTO observer.agent_turn_deltas(
+                               pod_id, turn_id, seq, body, occurred_at)
+                           VALUES($1, $2, $3, $4, $5)
+                           ON CONFLICT (pod_id, turn_id, seq) DO NOTHING""",
+                        data["pod_id"],
+                        data["turn_id"],
+                        data["seq"],
+                        data["body"],
+                        _parse_dt(data["occurred_at"]),
+                    )
             case "AgentTurnEnded":
                 async with self._pool.acquire() as conn:
                     await conn.execute(
