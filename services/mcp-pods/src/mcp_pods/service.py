@@ -475,7 +475,17 @@ class PodsService:
         deliveries each see zero pods and both insert new pod_ids
         (different PKs, so no unique-constraint backstop). The
         advisory lock serialises the check-and-claim instead.
+
+        Test gate: when `CONCLAVE_DISABLE_SPAWN_FIRST_POD=true`,
+        short-circuit without spawning. Smoke tests issue
+        proclamations without wanting a real pod-spawn + Claude
+        budget burn. Kanban #86.
         """
+        if os.environ.get("CONCLAVE_DISABLE_SPAWN_FIRST_POD", "").lower() in {
+            "1", "true", "yes"
+        }:
+            log.info("SpawnFirstPod gate set; skipping spawn")
+            return
         async with self._pool.acquire() as conn:
             async with conn.transaction():
                 # Lock key derived from the policy name; the same key

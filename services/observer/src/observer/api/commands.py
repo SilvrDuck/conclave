@@ -46,7 +46,7 @@ class CommandBody(
 
 @router.post("")
 async def post_command(request: Request, body: CommandBody) -> dict[str, str]:
-    state = request.app.state.observer
-    cr = CommandRouter(operator=OperatorService(pool=state.pool, bus=state.bus))
+    operator: OperatorService = request.app.state.operator
+    cr = CommandRouter(operator=operator)
     await cr.dispatch_validated(body.root)
     return {"status": "accepted"}

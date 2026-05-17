@@ -82,24 +82,31 @@ async def list_proclamations(request: Request) -> list[dict[str, Any]]:
 @router.get("/proposals")
 async def list_proposals(request: Request) -> list[dict[str, Any]]:
     pool = request.app.state.observer.pool
+    # Single query with a correlated LATERAL aggregate so ballots
+    # don't load the full senate.ballots table on every list call
+    # (kanban #26). The aggregate returns NULL when the proposal has
+    # no ballots; we coerce to [] in the Python layer.
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            """SELECT proposal_id, kind, proposer, strategy, summary, payload,
-                      eligible_voters, deadline, outcome, opened_at, closed_at
-                 FROM senate.proposals ORDER BY opened_at DESC LIMIT 100"""
-        )
-        ballots = await conn.fetch(
-            "SELECT proposal_id, voter, choice, comment, cast_at FROM senate.ballots"
-        )
-    by_prop: dict[str, list[dict[str, Any]]] = {}
-    for b in ballots:
-        by_prop.setdefault(b["proposal_id"], []).append(
-            {
-                "voter": b["voter"],
-                "choice": b["choice"],
-                "comment": b["comment"],
-                "cast_at": b["cast_at"].isoformat(),
-            }
+            """
+            SELECT p.proposal_id, p.kind, p.proposer, p.strategy, p.summary,
+                   p.payload, p.eligible_voters, p.deadline, p.outcome,
+                   p.opened_at, p.closed_at,
+                   b.ballots
+              FROM senate.proposals p
+              LEFT JOIN LATERAL (
+                  SELECT jsonb_agg(jsonb_build_object(
+                      'voter', voter,
+                      'choice', choice,
+                      'comment', comment,
+                      'cast_at', cast_at
+                  ) ORDER BY cast_at) AS ballots
+                    FROM senate.ballots
+                   WHERE proposal_id = p.proposal_id
+              ) b ON TRUE
+             ORDER BY p.opened_at DESC
+             LIMIT 100
+            """
         )
     return [
         {
@@ -114,7 +121,10 @@ async def list_proposals(request: Request) -> list[dict[str, Any]]:
             "outcome": r["outcome"],
             "opened_at": r["opened_at"].isoformat(),
             "closed_at": r["closed_at"].isoformat() if r["closed_at"] else None,
-            "ballots": by_prop.get(r["proposal_id"], []),
+            "ballots": [
+                {**b, "cast_at": b["cast_at"]}
+                for b in (r["ballots"] or [])
+            ],
         }
         for r in rows
     ]
