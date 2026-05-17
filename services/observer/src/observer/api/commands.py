@@ -17,6 +17,7 @@ from observer.services.command_router import (
     CommandRouter,
     EditCharterPayload,
     IssueProclamationPayload,
+    ResetStatePayload,
     RestartPodPayload,
     SendDirectMessagePayload,
 )
@@ -34,7 +35,8 @@ class CommandBody(
             | SendDirectMessagePayload
             | EditCharterPayload
             | CastBallotPayload
-            | RestartPodPayload,
+            | RestartPodPayload
+            | ResetStatePayload,
             Field(discriminator="kind"),
         ]
     ]

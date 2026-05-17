@@ -52,12 +52,24 @@ class RestartPodPayload(BaseModel):
     pod_id: str = Field(min_length=1)
 
 
+class ResetStatePayload(BaseModel):
+    """Wipe the entire platform back to its post-kickstart empty state:
+    every pod container removed, every rendered pods/<id>/ dir deleted,
+    every domain-table truncated. Used between realize → analyze → nuke
+    passes when the architect wants a clean swarm without restarting the
+    full Docker stack. Safe to invoke at any time; idempotent."""
+
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["ResetState"] = "ResetState"
+
+
 ValidatedCommand = (
     IssueProclamationPayload
     | SendDirectMessagePayload
     | EditCharterPayload
     | CastBallotPayload
     | RestartPodPayload
+    | ResetStatePayload
 )
 
 
