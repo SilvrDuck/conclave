@@ -42,10 +42,14 @@ COPY workspace /pod/workspace
 # root (security check, pass-3 G18). Create a non-root user and chown
 # everything the agent and workspace need to read/write. UID 1000
 # matches the host user in the typical dev setup.
+#
+# /home/pod/.claude must exist and be writable by `pod` BEFORE the
+# compose mount lands the credential file inside it. Docker would
+# otherwise auto-create the parent dir as root, leaving Claude CLI
+# unable to write session state for --resume. (G22.)
 RUN useradd -m -u 1000 -s /bin/bash pod \
-    && mkdir -p /pod/.claude \
-    && chown -R pod:pod /pod \
-    && chown -R pod:pod /root/.claude 2>/dev/null || true
+    && mkdir -p /home/pod/.claude/projects \
+    && chown -R pod:pod /pod /home/pod
 
 # Move the Claude creds mount target from /root/.claude to /home/pod/.claude
 # via HOME=/home/pod (compose template binds the file at that path now).
