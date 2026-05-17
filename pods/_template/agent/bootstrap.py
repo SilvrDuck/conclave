@@ -243,6 +243,10 @@ async def _run_claude(pod_id: str, prompt: str) -> None:
     cmd = [
         CLAUDE_BIN,
         "--print",
+        # Claude CLI rejects stream-json with --print unless --verbose
+        # is set. Without it the subprocess exits silently rc=0 — no
+        # stdout, no result frame, no usage. (Discovered pass-2 / G18.)
+        "--verbose",
         "--output-format", "stream-json",
         "--include-partial-messages",
         "--mcp-config", MCP_CONFIG_PATH,
