@@ -27,7 +27,7 @@ import { Phylactery } from "./Phylactery";
 import { Plate } from "./Plate";
 import { ProposalCartouche } from "./ProposalCartouche";
 import { EntityLink } from "./EntityLink";
-import { C, monogram } from "../theme";
+import { C, monogram, toRoman } from "../theme";
 
 export function FolioDrawer() {
   const { stack, pop, clear } = useFolio();
@@ -296,7 +296,10 @@ function ProclamationFolio({ seq }: { seq: string }) {
         </span>
       </Section>
       <Section title="Body">
-        <p style={{ fontSize: 16, lineHeight: 1.5 }} className="c-dropcap c-fade-in">
+        {/* Spec/09 §3: the drop cap appears only in Witness. In the
+         * folio drawer the proclamation body renders without it so
+         * the "one place in the app" rule stays honest. */}
+        <p style={{ fontSize: 16, lineHeight: 1.5, margin: 0 }}>
           <Linkified text={proc.text} />
         </p>
       </Section>
@@ -449,22 +452,6 @@ function EndpointFolio({ compositeId }: { compositeId: string }) {
       </Section>
     </>
   );
-}
-
-function toRoman(n: number): string {
-  const table: Array<[number, string]> = [
-    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
-    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
-    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
-  ];
-  let out = "";
-  for (const [v, sym] of table) {
-    while (n >= v) {
-      out += sym;
-      n -= v;
-    }
-  }
-  return out;
 }
 
 function formatHHMM(iso: string): string {

@@ -98,14 +98,38 @@ export function StuckTray({ pods, fullPage }: Props) {
         borderRadius: 2,
         boxShadow: `0 2px 6px rgba(0,0,0,0.3)`,
         maxWidth: 360,
-        cursor: open ? "default" : "pointer",
       }}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={(e) => {
+        // Collapse only when focus leaves the whole tray subtree.
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setOpen(false);
+        }
+      }}
       role="region"
       aria-label="stuck things"
     >
-      {open ? body : <span className="c-display-sm">{stuck.length} STUCK</span>}
+      {open ? (
+        body
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label={`expand stuck tray: ${stuck.length} item(s)`}
+          className="c-display-sm"
+          style={{
+            background: "transparent",
+            color: "inherit",
+            border: "none",
+            cursor: "pointer",
+            padding: 0,
+          }}
+        >
+          {stuck.length} STUCK
+        </button>
+      )}
     </div>
   );
 }

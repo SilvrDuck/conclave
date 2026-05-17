@@ -3,7 +3,7 @@
  * the same data typeset two ways. */
 
 import type { ReactNode } from "react";
-import { useFolio } from "../folio";
+import { useFolio, type EntityRef } from "../folio";
 import type { ActivityRow } from "../api";
 import { C } from "../theme";
 
@@ -99,7 +99,7 @@ function parsePayload(s: string): Record<string, unknown> {
 function render(
   eventType: string,
   p: Record<string, unknown>,
-): { summary: ReactNode; target?: import("../folio").EntityRef } {
+): { summary: ReactNode; target?: EntityRef } {
   const podLabel = p.pod_id ? String(p.pod_id).slice(0, 16) : "";
   switch (eventType) {
     case "ProclamationIssued": {

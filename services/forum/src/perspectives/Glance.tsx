@@ -6,7 +6,7 @@
  * 20px sits vertically centred on parchment. No counters, no
  * first-run wizard. */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import useSWR from "swr";
 import {
   Background,
@@ -25,7 +25,6 @@ import { StuckTray } from "../components/StuckTray";
 import { WaxSeal } from "../components/WaxSeal";
 import { useFolio } from "../folio";
 import { C } from "../theme";
-import { useState } from "react";
 
 const nodeTypes = { cartouche: PodCartoucheNode };
 
@@ -70,7 +69,7 @@ export function Glance() {
         position: "relative",
         flex: 1,
         display: "grid",
-        gridTemplateColumns: "1fr 240px",
+        gridTemplateColumns: "1fr 220px",
         height: "100%",
         minHeight: 0,
       }}
@@ -132,14 +131,23 @@ export function Glance() {
 
 function buildGraph(pods: Pod[], calls: Call[]): { nodes: Node[]; edges: Edge[] } {
   if (pods.length === 0) return { nodes: [], edges: [] };
-  // Simple circular layout — ReactFlow's auto-layout is left out
-  // intentionally; force-directed shifting on every refresh is a
-  // motion violation per §9.
-  const r = 220;
+  // Static layout (force-directed shifting on every refresh is a
+  // §9 motion violation). Radius grows with N so cartouches don't
+  // overlap past N≈12.
+  const minR = 220;
+  const r = Math.max(minR, pods.length * 28);
   const cx = 360;
   const cy = 280;
   const simulatorRe = /sim|oracle|environment/i;
   const nodes: Node[] = pods.map((p, i) => {
+    if (pods.length === 1) {
+      return {
+        id: p.pod_id,
+        type: "cartouche",
+        position: { x: cx, y: cy },
+        data: { pod: p, simulator: simulatorRe.test(p.display_role) },
+      };
+    }
     const theta = (2 * Math.PI * i) / pods.length;
     return {
       id: p.pod_id,

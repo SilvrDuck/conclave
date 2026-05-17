@@ -1,23 +1,25 @@
 /** Spec/09 §3 — Witness perspective. Two-column codex spread.
  *
- * Left (≈60%): Codex of Proclamations. Each proclamation is a real
- * page with a drop cap on its first paragraph, scribal numeral in the
- * gutter, body justified, and indented descendants below (councils,
- * proposals, decisions).
+ * Left (≈60%): Codex of Proclamations. Each proclamation rendered
+ * through the Proclamation component (only place that owns the drop
+ * cap), with indented descendants below (councils, proposals,
+ * decisions).
  *
- * Right (≈40%): Focused entity — whichever council, decision, or
- * proposal the user clicked from the left column. */
+ * Right (≈40%): Focused entity. Per §3 "never becomes empty": if
+ * nothing is clicked yet, we show the most-recently-active entity
+ * from the current proclamation (latest decision, falling back to
+ * latest council, falling back to latest proposal). */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import useSWR from "swr";
 import {
   fetcher,
-  type Proclamation,
+  type Proclamation as ProclamationT,
   type Council,
   type Decision,
   type Proposal,
 } from "../api";
-import { Linkified } from "../components/Linkified";
+import { Proclamation } from "../components/Proclamation";
 import { Plate } from "../components/Plate";
 import { Phylactery } from "../components/Phylactery";
 import { ProposalCartouche } from "../components/ProposalCartouche";
@@ -26,7 +28,7 @@ import type { EntityRef } from "../folio";
 import { C } from "../theme";
 
 export function Witness() {
-  const { data: procs } = useSWR<Proclamation[]>(
+  const { data: procs } = useSWR<ProclamationT[]>(
     "/state/proclamations",
     fetcher,
     { refreshInterval: 5000 },
@@ -42,6 +44,35 @@ export function Witness() {
   });
 
   const [focused, setFocused] = useState<EntityRef | null>(null);
+
+  // §3 — right column never empty: when nothing user-clicked, pick
+  // the latest descendant of the most-recent proclamation as the
+  // initial focus.
+  useEffect(() => {
+    if (focused !== null) return;
+    const top = (procs ?? [])[0];
+    if (!top) return;
+    const seqStr = String(top.seq);
+    const isFor = (origin: unknown) =>
+      typeof origin === "object" &&
+      origin !== null &&
+      (origin as { kind?: string }).kind === "proclamation" &&
+      (origin as { id?: string }).id === seqStr;
+    const latestDecision = (decisions ?? []).find((d) => isFor(d.origin));
+    if (latestDecision) {
+      setFocused({ kind: "decision", id: latestDecision.decision_id });
+      return;
+    }
+    const latestCouncil = (councils ?? [])[0];
+    if (latestCouncil) {
+      setFocused({ kind: "council", id: latestCouncil.council_id });
+      return;
+    }
+    const latestProposal = (proposals ?? [])[0];
+    if (latestProposal) {
+      setFocused({ kind: "proposal", id: latestProposal.proposal_id });
+    }
+  }, [focused, procs, decisions, councils, proposals]);
 
   return (
     <div
@@ -69,32 +100,36 @@ export function Witness() {
             the record is bare. proclaim, and pages will fill.
           </p>
         ) : (
-          (procs ?? []).map((p) => (
-            <ProclamationPage
-              key={p.seq}
-              proc={p}
-              councils={(councils ?? []).filter(
-                (c) =>
-                  c.decision_id != null &&
-                  decisions?.some(
-                    (d) =>
-                      d.decision_id === c.decision_id &&
-                      (d.origin as { id?: string })?.id === String(p.seq),
-                  ),
-              )}
-              decisions={(decisions ?? []).filter(
-                (d) => (d.origin as { id?: string })?.id === String(p.seq),
-              )}
-              proposals={(proposals ?? []).filter(
-                () =>
-                  // Proposals don't yet carry proclamation_seq directly;
-                  // include all open proposals on the most recent
-                  // proclamation only.
-                  p === procs?.[0],
-              )}
-              onFocus={setFocused}
-            />
-          ))
+          (procs ?? []).map((p, idx) => {
+            const seqStr = String(p.seq);
+            const isFor = (origin: unknown) =>
+              typeof origin === "object" &&
+              origin !== null &&
+              (origin as { kind?: string }).kind === "proclamation" &&
+              (origin as { id?: string }).id === seqStr;
+            const ds = (decisions ?? []).filter((d) => isFor(d.origin));
+            const cs = (councils ?? []).filter(
+              (c) =>
+                c.decision_id != null &&
+                ds.some((d) => d.decision_id === c.decision_id),
+            );
+            // Proposals don't carry proclamation_seq yet; surface
+            // open proposals only on the latest proclamation. Filed
+            // as kanban follow-up.
+            const ps = idx === 0 ? (proposals ?? []) : [];
+            return (
+              <ProclamationPage
+                key={p.seq}
+                proc={p}
+                councils={cs}
+                decisions={ds}
+                proposals={ps}
+                isLast={idx === (procs ?? []).length - 1}
+                next={(procs ?? [])[idx + 1] ?? null}
+                onFocus={setFocused}
+              />
+            );
+          })
         )}
       </div>
 
@@ -107,14 +142,13 @@ export function Witness() {
         }}
       >
         {focused ? (
-          <FocusedEntity ref={focused} />
+          <FocusedEntity target={focused} />
         ) : (
           <p
             className="c-faded"
             style={{ fontStyle: "italic", textAlign: "center", marginTop: 96 }}
           >
-            click a council, decision, or proposal in the codex to read it
-            here.
+            the record's reflection is empty.
           </p>
         )}
       </div>
@@ -127,38 +161,22 @@ function ProclamationPage({
   councils,
   decisions,
   proposals,
+  isLast,
+  next,
   onFocus,
 }: {
-  proc: Proclamation;
+  proc: ProclamationT;
   councils: Council[];
   decisions: Decision[];
   proposals: Proposal[];
+  isLast: boolean;
+  next: ProclamationT | null;
   onFocus: (ref: EntityRef) => void;
 }) {
   return (
-    <article style={{ position: "relative", marginBottom: 48 }}>
-      <header style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-        <span className="c-numeral c-gold">№ {toRoman(proc.seq)}</span>
-        <time
-          className="c-mono c-faded"
-          style={{ fontSize: 12 }}
-          dateTime={proc.issued_at}
-        >
-          {formatDate(proc.issued_at)}
-        </time>
-      </header>
-      <p
-        className="c-dropcap c-fade-in"
-        style={{
-          fontFamily: "var(--f-body)",
-          fontSize: "var(--t-proclamation)",
-          textAlign: "justify",
-          lineHeight: 1.55,
-          marginTop: 8,
-        }}
-      >
-        <Linkified text={proc.text} />
-      </p>
+    <section style={{ marginBottom: 48 }}>
+      <Proclamation proclamation={proc} fadeIn={false} />
+
       {(councils.length + decisions.length + proposals.length) > 0 ? (
         <ul
           style={{
@@ -172,9 +190,7 @@ function ProclamationPage({
             <li key={p.proposal_id} style={{ padding: "4px 0" }}>
               <button
                 type="button"
-                onClick={() =>
-                  onFocus({ kind: "proposal", id: p.proposal_id })
-                }
+                onClick={() => onFocus({ kind: "proposal", id: p.proposal_id })}
                 className="c-link"
                 style={{ background: "transparent", border: "none", padding: 0 }}
               >
@@ -233,14 +249,32 @@ function ProclamationPage({
           <span className="c-display-sm c-gold">CONCLUDED</span> {proc.summary}
         </div>
       ) : null}
-    </article>
+      {/* §3 catchword — italic first-word of the next proclamation,
+       * leading the eye down the codex like a printer's catchword. */}
+      {!isLast && next ? (
+        <div
+          aria-hidden
+          style={{
+            marginTop: 24,
+            paddingTop: 8,
+            borderTop: `0.5px dashed ${C.inkFaded}`,
+            textAlign: "right",
+            fontStyle: "italic",
+            fontSize: 13,
+            color: C.inkFaded,
+          }}
+        >
+          {next.text.split(/\s+/)[0]} …
+        </div>
+      ) : null}
+    </section>
   );
 }
 
-function FocusedEntity({ ref }: { ref: EntityRef }) {
-  if (ref.kind === "proposal") return <FocusedProposal id={ref.id} />;
-  if (ref.kind === "decision") return <FocusedDecision id={ref.id} />;
-  if (ref.kind === "council") return <FocusedCouncil id={ref.id} />;
+function FocusedEntity({ target }: { target: EntityRef }) {
+  if (target.kind === "proposal") return <FocusedProposal id={target.id} />;
+  if (target.kind === "decision") return <FocusedDecision id={target.id} />;
+  if (target.kind === "council") return <FocusedCouncil id={target.id} />;
   return null;
 }
 
@@ -328,28 +362,4 @@ function FocusedCouncil({ id }: { id: string }) {
       ) : null}
     </article>
   );
-}
-
-function toRoman(n: number): string {
-  const table: Array<[number, string]> = [
-    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
-    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
-    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
-  ];
-  let out = "";
-  for (const [v, sym] of table) {
-    while (n >= v) {
-      out += sym;
-      n -= v;
-    }
-  }
-  return out;
-}
-
-function formatDate(iso: string): string {
-  try {
-    return new Date(iso).toLocaleString();
-  } catch {
-    return iso;
-  }
 }

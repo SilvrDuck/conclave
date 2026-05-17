@@ -2,11 +2,14 @@
  *
  * One pip per eligible voter (filled monogram if cast, hollow if
  * pending, em-dash if abstain, wash if sortition-undrawn).
- * Strategy badge in Cinzel small-caps. Deadline countdown in mono. */
+ * Strategy badge in Cinzel small-caps. Deadline countdown in mono.
+ *
+ * Each pip is itself the clickable affordance — opening the voter's
+ * pod folio. No nested button-in-button. */
 
 import type { Ballot } from "../api";
+import { useFolio } from "../folio";
 import { C, monogram, podHue } from "../theme";
-import { EntityLink } from "./EntityLink";
 
 interface Props {
   strategy: string;
@@ -28,6 +31,7 @@ export function BallotStrip({
   ballots,
   deadline,
 }: Props) {
+  const folio = useFolio();
   const byVoter = new Map<string, Ballot>();
   for (const b of ballots) byVoter.set(b.voter, b);
 
@@ -53,9 +57,12 @@ export function BallotStrip({
           eligibleVoters.map((voter) => {
             const ballot = byVoter.get(voter);
             return (
-              <EntityLink key={voter} kind="pod" id={voter}>
-                <Pip voter={voter} ballot={ballot} />
-              </EntityLink>
+              <Pip
+                key={voter}
+                voter={voter}
+                ballot={ballot}
+                onClick={() => folio.open({ kind: "pod", id: voter })}
+              />
             );
           })
         )}
@@ -67,7 +74,15 @@ export function BallotStrip({
   );
 }
 
-function Pip({ voter, ballot }: { voter: string; ballot: Ballot | undefined }) {
+function Pip({
+  voter,
+  ballot,
+  onClick,
+}: {
+  voter: string;
+  ballot: Ballot | undefined;
+  onClick: () => void;
+}) {
   const base = {
     width: 22,
     height: 22,
@@ -79,33 +94,42 @@ function Pip({ voter, ballot }: { voter: string; ballot: Ballot | undefined }) {
     fontWeight: 600,
     fontSize: 10,
     border: `1px solid ${C.inkFaded}`,
-  };
+    cursor: "pointer",
+    padding: 0,
+  } as const;
+  const title = ballot?.comment ?? `${voter} — ${ballot?.choice ?? "pending"}`;
   if (!ballot) {
     return (
-      <span
+      <button
+        type="button"
         aria-label={`pending: ${voter}`}
+        title={title}
+        onClick={onClick}
         style={{ ...base, background: C.parchment, color: C.inkFaded }}
       >
         ·
-      </span>
+      </button>
     );
   }
   if (ballot.choice === "abstain") {
     return (
-      <span
+      <button
+        type="button"
         aria-label={`abstain: ${voter}`}
+        title={title}
+        onClick={onClick}
         style={{ ...base, background: C.wash, color: C.ink }}
       >
         —
-      </span>
+      </button>
     );
   }
-  // yes / no — filled monogram in pod identity colour. Border
-  // hints choice: solid for yes, dashed for no.
   return (
-    <span
+    <button
+      type="button"
       aria-label={`${ballot.choice}: ${voter}`}
-      title={ballot.comment ?? undefined}
+      title={title}
+      onClick={onClick}
       style={{
         ...base,
         background: podHue(voter),
@@ -117,7 +141,7 @@ function Pip({ voter, ballot }: { voter: string; ballot: Ballot | undefined }) {
       }}
     >
       {monogram(voter)}
-    </span>
+    </button>
   );
 }
 

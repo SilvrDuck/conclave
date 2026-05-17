@@ -6,7 +6,6 @@ import { fetcher, postCommand, type Pod, type Proposal } from "../api";
 import { ProposalCartouche } from "../components/ProposalCartouche";
 import { StuckTray } from "../components/StuckTray";
 import { WaxSeal } from "../components/WaxSeal";
-import { C } from "../theme";
 
 export function Inbox() {
   const { data: pods } = useSWR<Pod[]>("/state/pods", fetcher, {
@@ -106,5 +105,3 @@ function Vote({
   );
 }
 
-// keep the palette referenced — otherwise tsc complains about an unused import.
-void C;

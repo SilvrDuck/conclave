@@ -32,11 +32,19 @@ export function Direct() {
   }, [pods, selectedPodId]);
 
   const folio = useFolio();
-  // Keep the folio drawer mirrored to the selected pod so the live
-  // transcript stays visible. Per spec/09 §5: "The persistent right
-  // drawer's live stream lets Augustus see the nudge land."
+  // Per spec/09 §5 — the persistent right drawer mirrors the
+  // selected pod so the live transcript stays visible while editing
+  // the charter or sending a DM. Only push when the drawer's empty
+  // or its top entry already points at this pod; otherwise we'd
+  // hijack the user's own click-through navigation (a folio close
+  // would re-open immediately; an EntityLink to a council would be
+  // overwritten on the next render).
   useEffect(() => {
-    if (selectedPodId) {
+    if (!selectedPodId) return;
+    const top = folio.stack[folio.stack.length - 1];
+    const drawerEmpty = folio.stack.length === 0;
+    const onThisPod = top?.kind === "pod" && top.id === selectedPodId;
+    if (drawerEmpty || onThisPod) {
       folio.open({ kind: "pod", id: selectedPodId });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -138,8 +146,8 @@ function DMThread({ podId }: { podId: string }) {
         }}
       >
         <WaxSeal
-          letter="A"
-          label="Address"
+          letter="M"
+          label="Send missive"
           disabled={pending || !draft.trim()}
           onClick={async () => {
             const body = draft.trim();

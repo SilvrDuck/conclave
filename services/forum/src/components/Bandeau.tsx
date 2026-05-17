@@ -13,8 +13,14 @@
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import useSWR from "swr";
-import { fetcher, postCommand, type Proclamation, type Pod, type Proposal } from "../api";
-import { C } from "../theme";
+import {
+  fetcher,
+  postCommand,
+  type InboxItem,
+  type Pod,
+  type Proclamation,
+} from "../api";
+import { C, toRoman } from "../theme";
 import { WaxSeal } from "./WaxSeal";
 import { EntityLink } from "./EntityLink";
 
@@ -34,13 +40,15 @@ export function Bandeau({ perspective, onChangePerspective }: Props) {
   const { data: pods } = useSWR<Pod[]>("/state/pods", fetcher, {
     refreshInterval: 5000,
   });
-  const { data: proposals } = useSWR<Proposal[]>("/state/proposals", fetcher, {
-    refreshInterval: 5000,
-  });
+  const { data: inbox } = useSWR<InboxItem[]>(
+    "/inbox?for=__augustus__",
+    fetcher,
+    { refreshInterval: 5000 },
+  );
 
   const latest = procs?.[0];
   const hasConclave = (pods?.length ?? 0) > 0;
-  const inboxCount = countInbox(pods ?? [], proposals ?? []);
+  const inboxCount = (inbox ?? []).length;
   const overallStatus = computeStatus(pods ?? []);
 
   return (
@@ -87,22 +95,22 @@ export function Bandeau({ perspective, onChangePerspective }: Props) {
         onClick={() => onChangePerspective("inbox")}
         aria-label={`inbox — ${inboxCount} pending`}
         title={`inbox — ${inboxCount} pending`}
+        className="c-display"
         style={{
           background: "transparent",
           border: "none",
           padding: 0,
           cursor: "pointer",
-          fontFamily: "var(--f-display)",
-          fontWeight: 600,
           color: C.ink,
-          fontSize: 16,
+          fontSize: 13,
           position: "relative",
           marginLeft: "auto",
         }}
       >
-        №<sup style={{ fontSize: 9 }}>i</sup>
+        Inbox
         {inboxCount > 0 ? (
           <span
+            aria-hidden
             style={{
               position: "absolute",
               top: -4,
@@ -174,19 +182,6 @@ function PerspectiveToggle({
       })}
     </nav>
   );
-}
-
-function countInbox(pods: Pod[], proposals: Proposal[]): number {
-  let n = 0;
-  for (const p of pods) {
-    if (p.agent_state === "stuck" || p.runtime_status === "stopped") n++;
-  }
-  for (const pr of proposals) {
-    if (pr.outcome === "open" && pr.eligible_voters.includes("__augustus__")) {
-      n++;
-    }
-  }
-  return n;
 }
 
 function computeStatus(pods: Pod[]): { color: string; label: string } {
@@ -401,19 +396,3 @@ function ResetButton() {
   );
 }
 
-function toRoman(n: number): string {
-  if (n <= 0) return String(n);
-  const table: Array<[number, string]> = [
-    [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
-    [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
-    [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
-  ];
-  let out = "";
-  for (const [v, sym] of table) {
-    while (n >= v) {
-      out += sym;
-      n -= v;
-    }
-  }
-  return out;
-}

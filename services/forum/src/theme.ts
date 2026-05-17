@@ -44,3 +44,24 @@ export function podHue(podId: string): string {
   for (let i = 0; i < podId.length; i++) h = (h * 31 + podId.charCodeAt(i)) >>> 0;
   return POD_HUES[h % POD_HUES.length];
 }
+
+/** Scribal numeral. Used only on proclamation numerals and decision
+ * sealed-dates per spec/09 §7. */
+const ROMAN_TABLE: ReadonlyArray<readonly [number, string]> = [
+  [1000, "M"], [900, "CM"], [500, "D"], [400, "CD"],
+  [100, "C"], [90, "XC"], [50, "L"], [40, "XL"],
+  [10, "X"], [9, "IX"], [5, "V"], [4, "IV"], [1, "I"],
+];
+
+export function toRoman(n: number): string {
+  if (n <= 0) return String(n);
+  let out = "";
+  let remaining = n;
+  for (const [v, sym] of ROMAN_TABLE) {
+    while (remaining >= v) {
+      out += sym;
+      remaining -= v;
+    }
+  }
+  return out;
+}
