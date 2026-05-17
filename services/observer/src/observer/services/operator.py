@@ -116,18 +116,28 @@ class OperatorService:
 
     async def _on_pods_nuked(self, data: dict[str, Any]) -> None:
         """mcp-pods finished tearing down every pod. Truncate every
-        domain table in one transaction (CASCADE for safety), then
-        emit StateReset so the Forum and any future observers can
-        refresh their views."""
-        nuked = data.get("nuked_count", "?")
-        log.info("PodsNuked nuked_count=%s — truncating domain tables", nuked)
+        domain table in one transaction, then emit StateReset so the
+        Forum and any future observers can refresh their views.
+
+        Race note: ObservationService is a separate subscriber on
+        events.>. Stale events that landed before NukePods but are
+        still being projected may insert rows into observer.pod_state
+        / observer.activity after this truncate. The window is small
+        (typically <1s on a quiescent stack) and self-heals on the
+        next ResetState. Acceptable for an admin op; documented in
+        spec/08 §14."""
+        log.info(
+            "PodsNuked nuked_count=%d — truncating domain tables",
+            data["nuked_count"],
+        )
         async with self._pool.acquire() as conn:
             async with conn.transaction():
-                table_list = ", ".join(RESET_TABLES)
                 # RESTART IDENTITY so the proclamation seq counter goes
                 # back to 1 — the next pass really is "epoch I" again.
+                # No CASCADE: the only FKs are intra-schema, and both
+                # parents and children are in RESET_TABLES.
                 await conn.execute(
-                    f"TRUNCATE {table_list} RESTART IDENTITY CASCADE"
+                    f"TRUNCATE {', '.join(RESET_TABLES)} RESTART IDENTITY"
                 )
         await self._bus.publish_event(StateReset(), OPERATOR_CONTEXT)
         log.info("StateReset emitted")
