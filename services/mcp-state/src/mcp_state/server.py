@@ -145,6 +145,24 @@ async def activity(limit: int = 200, ctx: Context | None = None) -> list[dict[st
     return await _get(ctx, "/state/activity", limit=limit)
 
 
+@mcp.tool
+async def traces(
+    pod_id: str, limit: int = 20, ctx: Context | None = None
+) -> dict[str, Any]:
+    """Recent OTel traces involving `pod_id`. Returns a list of trace
+    summaries (`trace_id`, `root_service_name`, `start_time`,
+    `duration_ms`). Spec/05 §C5 mandates a `traces` surface on the
+    state aggregate; this is it."""
+    return await _get(ctx, "/state/traces", pod_id=pod_id, limit=limit)
+
+
+@mcp.tool
+async def trace(trace_id: str, ctx: Context | None = None) -> dict[str, Any]:
+    """Full span tree for `trace_id`. Use after `traces` returned a
+    summary you want to walk."""
+    return await _get(ctx, f"/state/traces/{trace_id}")
+
+
 def main() -> None:
     port = int(os.environ.get("PORT", "8000"))
     mcp.run(transport="http", host="0.0.0.0", port=port)

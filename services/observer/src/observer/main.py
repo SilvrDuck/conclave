@@ -22,6 +22,7 @@ from observer.reactors.health import HealthWatcher
 from observer.services.observation import ObservationService
 from observer.services.operator import OperatorService
 from observer.state import AppState, EventBroadcaster
+from observer.tempo import TempoClient
 
 log = logging.getLogger("observer")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -39,12 +40,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     async with Bus.connect(config.nats_url) as bus:
         broadcaster = EventBroadcaster()
         bus_close = asyncio.Event()
+        tempo = TempoClient()
         app_state = AppState(
             config=config,
             pool=pool,
             bus=bus,
             event_broadcaster=broadcaster,
             bus_close=bus_close,
+            tempo=tempo,
         )
         app.state.observer = app_state
 
@@ -73,6 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             log.info("observer shutting down")
             for r in reactors:
                 await r.stop()
+            await tempo.close()
             await pool.close()
 
 

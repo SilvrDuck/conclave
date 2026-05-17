@@ -13,6 +13,7 @@ import asyncpg
 from conclave_core import Bus
 
 from observer.config import Config
+from observer.tempo import TempoClient
 
 
 @dataclass
@@ -22,6 +23,7 @@ class AppState:
     bus: Bus
     event_broadcaster: EventBroadcaster
     bus_close: asyncio.Event
+    tempo: TempoClient
 
 
 class EventBroadcaster:
