@@ -1,11 +1,20 @@
-"""HealthWatcher — marks pods whose container goes away as stopped.
+"""HealthWatcher — span-staleness becomes agent_state, not runtime_status.
 
-Two signals:
-- An OTel error span (status_code != 2xx for a sustained run) for a known
-  src/dst pod marks the dst as unhealthy.
-- Long absence of any span from a pod previously seen marks it stopped.
+Pre-G21 (pass-2 finding): this reactor used OTel-span staleness to flip
+`runtime_status` from `running` to `stopped`. The signal is wrong — a
+quiet agent emits no spans, but the container is alive. We were marking
+live containers as stopped after 2 min of agent silence.
 
-This reactor runs in the Observer process (it owns the observer schema).
+Post-G21 split:
+- **runtime_status** flips only on real container death (Docker events
+  via mcp-pods — kanban #24). HealthWatcher leaves it alone.
+- **agent_state** flips to `idle` when no spans land for STALE_AFTER.
+  When activity resumes the ObservationService projection flips it
+  back to `thinking` naturally.
+
+Spans coming and going are normal in a long-running pod; treating
+their pause as a health signal is wrong. Agent-state staleness is the
+honest interpretation.
 """
 
 from __future__ import annotations
@@ -17,7 +26,7 @@ from datetime import UTC, datetime, timedelta
 import asyncpg
 from conclave_core import Bus
 from conclave_core.events import PodHealthChanged
-from conclave_core.models import PodRuntimeStatus
+from conclave_core.models import AgentState
 
 log = logging.getLogger("observer.reactor.health")
 
@@ -57,17 +66,20 @@ class HealthWatcher:
         async with self._pool.acquire() as conn:
             stale = await conn.fetch(
                 """SELECT pod_id FROM observer.pod_state
-                   WHERE runtime_status = 'running' AND last_seen < $1""",
+                   WHERE runtime_status = 'running'
+                     AND agent_state = 'thinking'
+                     AND last_seen < $1""",
                 cutoff,
             )
             for r in stale:
                 await conn.execute(
-                    """UPDATE observer.pod_state SET runtime_status = 'stopped'
-                       WHERE pod_id = $1""",
+                    """UPDATE observer.pod_state SET agent_state = 'idle'
+                       WHERE pod_id = $1
+                         AND agent_state = 'thinking'""",
                     r["pod_id"],
                 )
                 event = PodHealthChanged(
-                    pod_id=r["pod_id"], runtime_status=PodRuntimeStatus.STOPPED
+                    pod_id=r["pod_id"], agent_state=AgentState.IDLE
                 )
                 await self._bus.publish_event(event, "observer")
-                log.info("pod %s marked stopped (stale)", r["pod_id"])
+                log.info("pod %s agent_state → idle (no spans for >2m)", r["pod_id"])
