@@ -49,6 +49,78 @@ class PodsService:
         # Also guards against the architect spamming Reset from the UI.
         self._nuke_lock = asyncio.Lock()
 
+    async def reconcile_orphans(self) -> int:
+        """Run once on mcp-pods startup. If SpawnFirstPod inserted a
+        placeholder (display_role='tbd', admitted=FALSE) but the pod's
+        bootstrap.py crashed before register_self, the row sticks
+        around and `count(non-exiled) > 0` permanently blocks the
+        SpawnFirstPod policy. Reconcile by:
+
+        1. Selecting orphan candidates: NOT exiled, NOT admitted,
+           display_role IN ('tbd', pod_id) — that is, never renamed
+           from the placeholder.
+        2. For each: `docker container inspect conclave-<pod_id>`.
+           - exit 0 + State.Running == True → live pod, leave it.
+           - exit 0 + Running == False → exited; reap.
+           - exit != 0 → no container at all; reap.
+        3. Reap = remove the rendered pods/<id>/ dir + DELETE the
+           pods.pods row.
+
+        Returns the number of rows reaped. Safe to call multiple
+        times; idempotent on already-clean state.
+        """
+        async with self._pool.acquire() as conn:
+            rows = await conn.fetch(
+                """SELECT pod_id FROM pods.pods
+                    WHERE NOT exiled AND NOT admitted
+                      AND (display_role = 'tbd' OR display_role = pod_id)"""
+            )
+        candidates = [r["pod_id"] for r in rows]
+        if not candidates:
+            return 0
+        reaped: list[str] = []
+        for pod_id in candidates:
+            if await self._container_alive(pod_id):
+                continue
+            await self._reap_orphan(pod_id)
+            reaped.append(pod_id)
+        if reaped:
+            log.warning(
+                "orphan reconciler reaped %d placeholder pod row(s): %s",
+                len(reaped), reaped,
+            )
+        return len(reaped)
+
+    async def _container_alive(self, pod_id: str) -> bool:
+        """True iff `conclave-<pod_id>` container exists and is Running."""
+        proc = await asyncio.create_subprocess_exec(
+            "docker", "container", "inspect",
+            "--format", "{{.State.Running}}",
+            f"conclave-{pod_id}",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+        try:
+            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=10)
+        except TimeoutError:
+            proc.kill()
+            await proc.wait()
+            return False
+        if proc.returncode != 0:
+            return False
+        return stdout.decode().strip() == "true"
+
+    async def _reap_orphan(self, pod_id: str) -> None:
+        """Remove rendered dir + delete the pods.pods row."""
+        pod_dir = PODS_DIR / pod_id
+        if pod_dir.exists():
+            shutil.rmtree(pod_dir, ignore_errors=True)
+        async with self._pool.acquire() as conn:
+            await conn.execute(
+                "DELETE FROM pods.pods WHERE pod_id = $1 AND NOT admitted",
+                pod_id,
+            )
+
     async def register_self(
         self,
         *,
